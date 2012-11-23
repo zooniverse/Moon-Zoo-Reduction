@@ -45,7 +45,7 @@ def pix2latlong(crater_csv, output_csv, cub_file):
         # if i > 10: break
         # Get data for one object from input file
         try:
-            line, sample, diam = [float(x) for x in inLine.split(',')[:3]]
+            sample, line, diam = [float(x) for x in inLine.split(',')[:3]]
         except ValueError:
             if i == 0:
                 continue  # probably csv file header
@@ -67,7 +67,7 @@ def pix2latlong(crater_csv, output_csv, cub_file):
         os.remove('tmp.csv')
         ls = l.split(',')
         lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
-        diam_metres = diam * latpixscale
+        diam_metres = diam * longpixscale
         out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
     f.close()
     out.close()
