@@ -32,7 +32,7 @@ def img2cub(img, cub):
     status = os.system(cmd)
     if status > 0:
         raise ISISError("Execution of lronac2isis failed.")
-    cmd = 'lronaccal from=%s to=%s'%(tmp, cub)
+    cmd = 'lronaccal from=%s to=%s'%(tmp, cub.replace(".cub", ""))
     status = os.system(cmd)
     if status > 0:
         raise ISISError("Execution of lronaccal failed.")
