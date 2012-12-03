@@ -2,6 +2,8 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
+    Version 2012-12-03
+
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
 
@@ -30,7 +32,7 @@
 import os, sys, getopt
 from string import strip
 
-def pix2latlong(crater_csv, output_csv, cub_file):
+def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
     # Open output file for writing
     out = file(output_csv, 'w')
     out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
@@ -51,6 +53,12 @@ def pix2latlong(crater_csv, output_csv, cub_file):
                 continue  # probably csv file header
             else:
                 raise Usage("Input file in wrong format")
+        # The 'first guess' NAC R image coordinates are flipped horizontally
+        # To solve this, ideally, the NAC coords would be fixed appropriately.
+        # However, as a fudged solution, the user may provide a width for
+        # the original NAC image, which will be used to flip the x-coord.
+        if flipwidth > 0:
+            sample = flipwidth - sample
         # Construct command line
         cmd = 'campt from=%s to=tmp.csv format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, line, sample)
         #print cmd
@@ -97,18 +105,24 @@ def main(argv=None):
                 return 1
             if o in ("-f", "--force"):
                 clobber = True
+        if len(args) not in (3, 4):
+            raise Usage("Wrong number of arguments")
         if len(args) == 3:
             crater_csv, output_csv, cub_file = args
-            if not os.path.exists(crater_csv):
-                raise Usage("Input crater file does not exist: %s"%crater_csv)
-            elif os.path.exists(output_csv) and (not clobber):
-                raise Usage("Output file already exists: %s\nUse -f to overwrite."%output_csv)
-            elif not os.path.exists(cub_file):
-                raise Usage("Input cub file does not exist: %s"%cub_file)
-            else:
-                pix2latlong(crater_csv, output_csv, cub_file)
-        else:
-            raise Usage("Wrong number of arguments")
+            flipwidth = 0
+        elif len(args) == 4:
+            crater_csv, output_csv, cub_file, flipwidth = args
+        try:
+            flipwidth = int(flipwidth)
+        except ValueError:
+            raise Usage("Input flipwidth must be an integer: %s"%flipwidth)
+        if not os.path.exists(crater_csv):
+            raise Usage("Input crater file does not exist: %s"%crater_csv)
+        elif os.path.exists(output_csv) and (not clobber):
+            raise Usage("Output file already exists: %s\nUse -f to overwrite."%output_csv)
+        elif not os.path.exists(cub_file):
+            raise Usage("Input cub file does not exist: %s"%cub_file)
+        pix2latlong(crater_csv, output_csv, cub_file, flipwidth)
     except Usage, err:
         print >>sys.stderr, err.msg
         print >>sys.stderr, "For help use --help"
