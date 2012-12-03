@@ -24,7 +24,7 @@ from string import strip
 import tempfile
 from pipes import quote
 
-def img2cub(img, cub):
+def img2cub(img, cub, spiceinit=True):
     if os.path.exists(cub):
         os.remove(cub)
     tmp = tempfilename()
@@ -37,11 +37,12 @@ def img2cub(img, cub):
     if status > 0:
         raise ISISError("Execution of lronaccal failed.")
     os.remove(tmp)
-    print 'spiceinit...'
-    cmd = 'spiceinit from=%s'%cub
-    status = os.system(cmd)
-    if status > 0:
-        raise ISISError("Execution of spiceinit failed.")
+    if spiceinit:
+        print 'spiceinit...'
+        cmd = 'spiceinit from=%s'%cub
+        status = os.system(cmd)
+        if status > 0:
+            raise ISISError("Execution of spiceinit failed.")
     print 'done'
 
 def tempfilename():
