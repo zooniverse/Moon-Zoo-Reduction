@@ -2,7 +2,7 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2012-12-03
+    Version 2013-02-05
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
@@ -17,7 +17,7 @@
 
     This program uses the ISIS routine 'campt' to convert the input
     pixel coordinates and sizes into latitude, longitude and size in
-    metres.
+    kilometres.
     
     The crater_csv file is expected to contain x, y and radius as the
     first three columns, but it may contain further columns, which are
@@ -35,7 +35,8 @@ from string import strip
 def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
     # Open output file for writing
     out = file(output_csv, 'w')
-    out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
+    #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
+    out.write('long, lat, size_km\n')
     # Open input file
     f = file(crater_csv) 
     # Loop over each line, send line,sample to campt
@@ -76,7 +77,9 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
         ls = l.split(',')
         lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
         diam_metres = diam * longpixscale
-        out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
+        diam_km = diam_metres / 1000.0
+        #out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
+        out.write('%f, %f, %f\n'%(long, lat, diam_km))
     f.close()
     out.close()
     if i == 0:
