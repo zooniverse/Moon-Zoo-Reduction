@@ -47,8 +47,8 @@ cd /mnt/moonzoo
 wget http://zooniverse-code.s3.amazonaws.com/databases/050213/moonzoo_production_050213.sql.gz
 wget http://moonzoo.s3.amazonaws.com/v10/database/MZP.db
 wget -OMZP_A17.db http://moonzoo.s3.amazonaws.com/v21/database/MZP.db
-wget http://moonzoo.s3.amazonaws.com/reduction/july2012/reduce_mz_db.sql
-wget http://moonzoo.s3.amazonaws.com/reduction/july2012/reduce_mz_db.py
+wget http://moonzoo.s3.amazonaws.com/reduction/feb2013/reduce_mz_db.sql
+wget http://moonzoo.s3.amazonaws.com/reduction/feb2013/reduce_mz_db.py
 
 echo 'create database moonzoo' | mysql -u root
 cat moonzoo_production_050213.sql.gz | gunzip | mysql -u root moonzoo &
