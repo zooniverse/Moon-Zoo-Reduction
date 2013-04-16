@@ -4,7 +4,7 @@ from string import strip
 import numpy
 import csv
 
-datapath = '/Users/spb/Work/projects/MoonZoo/data/2012-07-02'
+datapath = '/mnt/moonzoo/'
 
 rnames = ['annotation_id', 'classification_id', 'task_id', 'answer_id', 'nac_name', 'asset_id', 'name',
           'asset_created_at', 'value', 'x_min', 'x_max', 'y_min', 'y_max', 'parent_trim_left', 'parent_trim_right',
@@ -97,14 +97,15 @@ def untransform_craters():
     expr.setOutput(ydnac)
     expr.eval()
 
-    trim = t.cols.parent_trim_left
+    ltrim = t.cols.parent_trim_left
+    rtrim = t.cols.parent_trim_right
     width = t.cols.parent_image_width
     height = t.cols.parent_image_height
     transfo = t.cols.transfo
     xnac = t.cols.xnac
     ynac = t.cols.ynac
 
-    expr = Expr('where(transfo % 2 == 0, xtranac + trim, width - xtranac - trim)')
+    expr = Expr('where(transfo % 2 == 0, xtranac + ltrim, xtranac + rtrim)')
     expr.setOutput(xnac)
     expr.eval()
 
@@ -150,14 +151,15 @@ def untransform_regions():
     expr.setOutput(ydnac)
     expr.eval()
 
-    trim = t.cols.parent_trim_left
+    ltrim = t.cols.parent_trim_left
+    rtrim = t.cols.parent_trim_right
     width = t.cols.parent_image_width
     height = t.cols.parent_image_height
     transfo = t.cols.transfo
     xnac = t.cols.xnac
     ynac = t.cols.ynac
 
-    expr = Expr('where(transfo % 2 == 0, xtranac + trim, width - xtranac - trim)')
+    expr = Expr('where(transfo % 2 == 0, xtranac + ltrim, xtranac + rtrim)')
     expr.setOutput(xnac)
     expr.eval()
 
@@ -172,10 +174,10 @@ def untransform_regions():
 
 def h5tocsv():
     h5file = openFile(os.path.join(datapath, 'mz_results.h5'))
-    # writer = csv.writer(open(os.path.join(datapath, 'mz_craters.csv'), 'wb'))
-    # writer.writerow(h5file.root.craters.colnames)
-    # for row in h5file.root.craters:
-    #     writer.writerow(row[:])
+    writer = csv.writer(open(os.path.join(datapath, 'mz_craters.csv'), 'wb'))
+    writer.writerow(h5file.root.craters.colnames)
+    for row in h5file.root.craters:
+        writer.writerow(row[:])
     writer = csv.writer(open(os.path.join(datapath, 'mz_regions.csv'), 'wb'))
     writer.writerow(h5file.root.regions.colnames)
     for row in h5file.root.regions:
@@ -292,3 +294,9 @@ class MZBoulder(IsDescription):
     asset_id1 = UInt64Col()
     asset_id2 = UInt64Col()
     winner = UInt8Col()
+
+if __name__ == "__main__":
+    make_hdf5()
+    untransform_craters()
+    untransform_regions()
+    h5tocsv()
