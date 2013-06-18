@@ -2,7 +2,7 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2013-02-05
+    Version 2013-06-18
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
@@ -21,11 +21,20 @@
     
     The crater_csv file is expected to contain x, y and radius as the
     first three columns, but it may contain further columns, which are
-    ignored.
+    ignored.  This file may be created using the following SQL code:
+        SELECT xnac, ynac, x_diameter_nac, y_diameter_nac,
+               angle_nac, boulderyness
+        INTO OUTFILE 'craters.csv'
+        FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
+        LINES TERMINATED BY '\n'
+        FROM craters
 
-    The product is another csv file, containing x, y and radius in
-    pixel space from the input file, with the addition of the
-    latitude, longitude and size in metres for each entry.
+    The product is another csv file, containing the longitude, latitude,
+    two sizes, angle and boulderyness for each entry.
+
+    It is currently not clear exactly what the sizes refer to (major/minor axis lengths,
+    or sizes projected on the long and lat axes), and the conversion to metres is probably
+    incorrect if the long and lat pixel scales are different.
     
 """
 
@@ -36,7 +45,7 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
     # Open output file for writing
     out = file(output_csv, 'w')
     #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
-    out.write('long, lat, size_km\n')
+    out.write('long, lat, xdiam_km, ydiam_km, angle, boulderyness\n')
     # Open input file
     f = file(crater_csv) 
     # Loop over each line, send line,sample to campt
@@ -48,7 +57,9 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
         # if i > 10: break
         # Get data for one object from input file
         try:
-            sample, line, diam = [float(x) for x in inLine.split(',')[:3]]
+            fields = inLine.split(',')
+            sample, line, xdiam, ydiam, angle = [float(x) for x in fields[:5]]
+            boulderyness = int(fields[5])
         except ValueError:
             if i == 0:
                 continue  # probably csv file header
@@ -76,10 +87,17 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
         os.remove('tmp.csv')
         ls = l.split(',')
         lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
-        diam_metres = diam * longpixscale
-        diam_km = diam_metres / 1000.0
+        # The following won't work if the lat and long pixel scales are different,
+        # and it is not clear axatly what the "diameters" refer to.
+        # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
+        # or projected sizes in long and lat.
+        pixscale = (latpixscale + longpixscale)/2.0
+        xdiam_metres = xdiam * pixscale
+        ydiam_metres = ydiam * pixscale
+        xdiam_km = xdiam_metres / 1000.0
+        ydiam_km = ydiam_metres / 1000.0
         #out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
-        out.write('%f, %f, %f\n'%(long, lat, diam_km))
+        out.write('%f, %f, %f\n'%(long, lat, xdiam_km, ydiam_km, angle, boulderyness))
     f.close()
     out.close()
     if i == 0:
