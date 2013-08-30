@@ -114,7 +114,7 @@ def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, flipwidth=0, na
         ls = l.split(',')
         lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
         # The following won't work if the lat and long pixel scales are different,
-        # and it is not clear axatly what the "diameters" refer to.
+        # and it is not clear exactly what the "diameters" refer to.
         # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
         # or projected sizes in long and lat.
         pixscale = (latpixscale + longpixscale)/2.0
