@@ -72,4 +72,6 @@ cat mzslices_a17.csv >> mzslices.csv
 
 cat reduce_mz_db.sql | mysql -uroot moonzoo &> reduce_mz_db.sql.out
 
-python reduce_mz_db.py &> reduce_mz_db.py  # actually done function by function last time
+python reduce_mz_db.py &> reduce_mz_db.py.out  # actually done function by function last time
+
+cat read_reduced_mz_tables.sql | mysql -uroot moonzoo &> read_reduced_mz_tables.sql.out
