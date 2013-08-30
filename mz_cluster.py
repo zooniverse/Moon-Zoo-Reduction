@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-"""mz_cluster.py - Try out clustering on MZ data
+"""mz_cluster.py - Perform clustering on MZ data.
 
     Version 2013-08-29
 
@@ -24,13 +24,10 @@ import matplotlib
 import matplotlib.pyplot as pyplot
 import scipy.cluster
 #import fastcluster
-import timeit
-from sklearn.cluster import DBSCAN
-from sklearn import metrics
 
-from IPython import embed
-from IPython.core import ultratb
-
+# Some debugging tools:
+#from IPython import embed
+#from IPython.core import ultratb
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
 matplotlib.rcParams.update({'font.size': 14})
@@ -186,6 +183,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
     # If this is a test, calculate some metrics
     if test:
+        from sklearn import metrics
         print
         print("Homogeneity: %0.3f" % metrics.homogeneity_score(labels_true, clusters))
         print("Completeness: %0.3f" % metrics.completeness_score(labels_true, clusters))
@@ -325,6 +323,8 @@ def dbscanclusterdata(X, t, m, metric='euclidean'):
     """
     Attempt at using sklearn.DBSCAN - but no faster than fastcluster
     """
+    from sklearn.cluster import DBSCAN
+
     X = numpy.asarray(X, order='c', dtype=numpy.double)
 
     if type(X) != numpy.ndarray or len(X.shape) != 2:
@@ -428,6 +428,7 @@ def plot_crater_stats(crater_mean, truth, output_filename_base):
     pyplot.figure(figsize=(6., 8.))
     sf_bins_clust, sf_clust = plot_sizefreq(crater_mean[2], label='clustered')
     if truth is not None:
+        print
         sf_bins_truth, sf_truth = plot_sizefreq(truth[2], sf_bins_clust, label='truth')
         ok = (sf_clust > 0) & (sf_truth > 0)
         delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
@@ -515,6 +516,7 @@ def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat
 
     
 def timetest():
+    import timeit
     print('Time: %f s'%min(timeit.repeat(stmt='mz_cluster.mz_cluster()', setup='import mz_cluster', repeat=3, number=1)))
 
     
