@@ -242,12 +242,12 @@ select * into outfile '/mnt/csv/mz_results_craters.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results
-where task_id=1;
+where task_id=1 and answer_id=1;
 
 select * into outfile '/mnt/csv/mz_results_regions.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results
-where task_id=2;
+where task_id=2 and answer_id=3;
 
 -- boulders are more complicated as need to get both asset_ids
