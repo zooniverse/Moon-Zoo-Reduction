@@ -2,7 +2,7 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2013-06-18
+    Version 2013-08-30
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
@@ -23,7 +23,7 @@
     first three columns, but it may contain further columns, which are
     ignored.  This file may be created using the following SQL code:
         SELECT xnac, ynac, x_diameter_nac, y_diameter_nac,
-               angle_nac, boulderyness
+               angle_nac, boulderyness, zoom, zooniverse_id
         INTO OUTFILE 'craters.csv'
         FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
         LINES TERMINATED BY '\n'
@@ -41,9 +41,12 @@
 import os, sys, getopt
 from string import strip
 
+# This could be made substantially faster by creating some c++ code based on
+# campt.cpp to read a list of line,sample and output a list of long,lat.
+# The ISIS3 source code is all available at "rsync isisdist.astrogeology.usgs.gov::"
 
-*** ADAPT THIS TO READ FROM (AND WRITE TO?) SQL DB DIRECTLY
-*** IF OUTPUT CSV, NEED TO RETAIN ZOOM LEVEL AND USER ID
+# IN PROGRESS ADAPTING THIS TO READ FROM (AND WRITE TO?) SQL DB DIRECTLY
+# IF OUTPUTING CSV, NEED TO RETAIN ZOOM LEVEL AND USER ID
 
 def read_db(nac_name='M104311715RE'):
     # not yet tested...
@@ -58,13 +61,16 @@ def read_db(nac_name='M104311715RE'):
     db.close()
 
 
-def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
+def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, flipwidth=0, nac_name='M104311715RE'):
     # Open output file for writing
     out = file(output_csv, 'w')
     #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
-    out.write('long, lat, xdiam_km, ydiam_km, angle, boulderyness\n')
+    out.write('long, lat, xdiam_km, ydiam_km, angle, boulderyness, zoom, user\n')
     # Open input file
-    f = file(crater_csv) 
+    if crater_csv is None:
+        f = read_db(nac_name)
+    else:
+        f = file(crater_csv) 
     # Loop over each line, send line,sample to campt
     i = 0
     for i, inLine in enumerate(f):
@@ -73,15 +79,18 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
         # Following line is for testing on small sample
         # if i > 10: break
         # Get data for one object from input file
-        try:
-            fields = inLine.split(',')
-            sample, line, xdiam, ydiam, angle = [float(x) for x in fields[:5]]
-            boulderyness = int(fields[5])
-        except ValueError:
-            if i == 0:
-                continue  # probably csv file header
-            else:
-                raise Usage("Input file in wrong format")
+        if crater_csv is None:
+            try:
+                fields = inLine.split(',')
+                sample, line, xdiam, ydiam, angle = [float(x) for x in fields[:5]]
+                boulderyness, zoom, user = [int(x) for x in fields[5:8]]
+            except ValueError:
+                if i == 0:
+                    continue  # probably csv file header
+                else:
+                    raise Usage("Input file in wrong format")
+        else:
+            sample, line, xdiam, ydiam, angle, boulderyness, zoom, user = inLine
         # The 'first guess' NAC R image coordinates are flipped horizontally
         # To solve this, ideally, the NAC coords would be fixed appropriately.
         # However, as a fudged solution, the user may provide a width for
