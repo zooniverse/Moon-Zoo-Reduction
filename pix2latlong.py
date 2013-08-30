@@ -2,7 +2,7 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2013-06-18
+    Version 2013-06-27
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
@@ -39,13 +39,14 @@
 """
 
 import os, sys, getopt
+from math import sin, cos, sqrt, pi
 from string import strip
 
 def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
     # Open output file for writing
     out = file(output_csv, 'w')
     #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
-    out.write('long, lat, xdiam_km, ydiam_km, angle, boulderyness\n')
+    out.write('long, lat, xradius, yradius, angle, boulderyness\n')
     # Open input file
     f = file(crater_csv) 
     # Loop over each line, send line,sample to campt
@@ -91,13 +92,16 @@ def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
         # and it is not clear axatly what the "diameters" refer to.
         # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
         # or projected sizes in long and lat.
-        pixscale = (latpixscale + longpixscale)/2.0
-        xdiam_metres = xdiam * pixscale
-        ydiam_metres = ydiam * pixscale
-        xdiam_km = xdiam_metres / 1000.0
-        ydiam_km = ydiam_metres / 1000.0
+        xradius = xdiam / 2.0
+        xradius_long = abs(xradius * cos(angle*pi/180.0) * longpixscale)
+        xradius_lat = abs(xradius * sin(angle*pi/180.0) * latpixscale)
+        xradius_metres = sqrt(xradius_long**2 + xradius_lat**2)
+        yradius = ydiam / 2.0
+        yradius_long = abs(yradius * sin(angle*pi/180.0) * longpixscale)
+        yradius_lat = abs(yradius * cos(angle*pi/180.0) * latpixscale)
+        yradius_metres = sqrt(yradius_long**2 + yradius_lat**2)
         #out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
-        out.write('%f, %f, %f\n'%(long, lat, xdiam_km, ydiam_km, angle, boulderyness))
+        out.write('%f, %f, %f, %f, %f, %f\n'%(long, lat, xradius_metres, yradius_metres, angle, boulderyness))
     f.close()
     out.close()
     if i == 0:
