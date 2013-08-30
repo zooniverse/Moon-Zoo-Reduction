@@ -41,6 +41,23 @@
 import os, sys, getopt
 from string import strip
 
+
+*** ADAPT THIS TO READ FROM (AND WRITE TO?) SQL DB DIRECTLY
+*** IF OUTPUT CSV, NEED TO RETAIN ZOOM LEVEL AND USER ID
+
+def read_db(nac_name='M104311715RE'):
+    # not yet tested...
+    db = pymysql.connect(host="localhost", user="root", passwd="", db="moonzoo")
+    cur = db.cursor() 
+    sql = """SELECT xnac, ynac, x_diameter_nac, y_diameter_nac, 
+                    angle_nac, boulderyness, zoom, zooniverse_user_id
+             FROM craters
+             WHERE nac_name=`%s`;"""%nac_name
+    cur.execute(sql)
+    data = numpy.recarray(cur.fetchall())
+    db.close()
+
+
 def pix2latlong(crater_csv, output_csv, cub_file, flipwidth=0):
     # Open output file for writing
     out = file(output_csv, 'w')
