@@ -127,7 +127,7 @@ def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, flipwidth=0, na
         yradius_lat = abs(yradius * cos(angle*pi/180.0) * latpixscale)
         yradius_metres = sqrt(yradius_long**2 + yradius_lat**2)
         #out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
-        out.write('%f, %f, %f, %f, %f, %f\n'%(long, lat, xradius_metres, yradius_metres, angle, boulderyness))
+        out.write('%f, %f, %f, %f, %f, %i, %i, %i\n'%(long, lat, xradius_metres, yradius_metres, angle, boulderyness, zoom, user))
     f.close()
     out.close()
     if i == 0:
