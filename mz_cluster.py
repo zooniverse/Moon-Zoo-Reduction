@@ -103,12 +103,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
             long_min, long_max, lat_min, lat_max = datarange
     # Get markings data
     data = numpy.genfromtxt(moonzoo_markings_csv, delimiter=None, names=True)
-    points = numpy.array([data['x'], data['y'], data['size_m']])
-    #points = numpy.array([data['long'], data['lat'], data['xradius']])
-    if test:
-        # If this is a test we know the true clustering,
-        # which can be used to evaluate performance
-        labels_true = numpy.array(data['truelabel'], dtype=numpy.int)
+    #points = numpy.array([data['x'], data['y'], data['size_m']])
+    points = numpy.array([data['long'], data['lat'], data['radius'], data['axialratio'],
+                          data['angle'], data['boulderyness'], data['minsize'], data['user'])
     datarange = (points[0].min(), points[0].max(), points[1].min(), points[1].max())
     print('Markings cover region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
     # Select region of interest
@@ -117,7 +114,13 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     select &= (points[1] >= lat_min) & (points[1] <= lat_max)
     points = points[:,select]
     if test:
-        labels_true = labels_true[select]
+        # If this is a test we know the true clustering,
+        # which can be used to evaluate performance
+        labels_true = numpy.array(data['truelabel'], dtype=numpy.int)[select]
+    if 'minsize' in data.names:
+        minsize = numpy.array(data['minsize'], dtype=numpy.bool)[select]
+    if 'user' in data.names:
+        user = numpy.array(data['user'], dtype=numpy.int)[select]
     if truth is not None:
         select = (truth[0] >= long_min) & (truth[0] <= long_max)
         select &= (truth[1] >= lat_min) & (truth[1] <= lat_max)
@@ -170,7 +173,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     print('Found %i final clusters'%len(crater_count))
     # Write final crater catalogue to a csv file
     fout = open(output_filename_base+'_craters.csv', 'w')
-    fout.write('long,long_err,lat,lat_err,xradius,xradius_err\n')
+    fout.write('long,long_err,lat,lat_err,radius,radius_err\n')
     for i in range(len(crater_count)):
         x = (crater_mean[0,i], crater_stdev[0,i], crater_mean[1,i], crater_stdev[1,i],
              crater_mean[2,i], crater_stdev[2,i])
@@ -285,12 +288,12 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.2, pwrong=0.2):
     # convert x,y in metres into long,lat
     x, y, cx, cy = numpy.multiply((x, y, cx, cy), degrees_per_metre)
     f = file('truthcraters.csv', 'w')
-    f.write('long,lat,xradius\n')
+    f.write('long,lat,radius\n')
     for i in range(len(cx)):
         f.write('%f,%f,%f\n'%(cx[i], cy[i], cr[i]))
     f.close()        
     f = file('testcraters.csv', 'w')
-    f.write('long,lat,xradius,flag,truelabel\n')
+    f.write('long,lat,radius,flag,truelabel\n')
     for i in range(len(x)):
         f.write('%f,%f,%f,%i,%i\n'%(x[i], y[i], r[i], flag[i], truelabel[i]))
     f.close()        

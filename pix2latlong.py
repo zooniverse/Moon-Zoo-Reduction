@@ -2,136 +2,125 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2013-08-30
+    Version 2013-09-02
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
 
     Usage examples:
-        If pix2latlong.py is executable and on the path:
-            pix2latlong.py craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub
-        If pix2latlong.py is executable and not on the path:
-            ./pix2latlong.py craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub
-        If pix2latlong.py is not executable and not on the path:
+        Using csv input:
             python pix2latlong.py craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub
-
+        Using database input (database name 'moonzoo'), also need to specify nac_name:
+            python db:moonzoo craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub, M101963963LE
+        
     This program uses the ISIS routine 'campt' to convert the input
-    pixel coordinates and sizes into latitude, longitude and size in
-    kilometres.
+    pixel coordinates and sizes into latitude, longitude and size in metres.
     
-    The crater_csv file is expected to contain x, y and radius as the
-    first three columns, but it may contain further columns, which are
-    ignored.  This file may be created using the following SQL code:
+    The crater_csv file is expected to contain specific columns.
+    This file may be created using the following SQL code:
         SELECT xnac, ynac, x_diameter_nac, y_diameter_nac,
-               angle_nac, boulderyness, zoom, zooniverse_id
+               angle_nac, boulderyness, zoom, zooniverse_user_id
         INTO OUTFILE 'craters.csv'
         FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '"'
         LINES TERMINATED BY '\n'
-        FROM craters
+        FROM craters;
+    The file will be output wherever your database files live.
 
     The product is another csv file, containing the longitude, latitude,
-    two sizes, angle and boulderyness for each entry.
+    size, axial_ratio, angle, boulderyness, minsize flag and user id for each entry.
 
-    It is currently not clear exactly what the sizes refer to (major/minor axis lengths,
-    or sizes projected on the long and lat axes), and the conversion to metres is probably
-    incorrect if the long and lat pixel scales are different.
     
 """
 
 import os, sys, getopt
 from math import sin, cos, sqrt, pi
 from string import strip
+import numpy
+import tempfile
+from multiprocessing import Pool
 
 # This could be made substantially faster by creating some c++ code based on
 # campt.cpp to read a list of line,sample and output a list of long,lat.
 # The ISIS3 source code is all available at "rsync isisdist.astrogeology.usgs.gov::"
 
-# IN PROGRESS ADAPTING THIS TO READ FROM (AND WRITE TO?) SQL DB DIRECTLY
-# IF OUTPUTING CSV, NEED TO RETAIN ZOOM LEVEL AND USER ID
-
-def read_db(nac_name='M104311715RE'):
+def read_db(nac_name='M104311715RE', db='moonzoo'):
+    import pymysql
     # not yet tested...
-    db = pymysql.connect(host="localhost", user="root", passwd="", db="moonzoo")
+    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
     cur = db.cursor() 
     sql = """SELECT xnac, ynac, x_diameter_nac, y_diameter_nac, 
                     angle_nac, boulderyness, zoom, zooniverse_user_id
-             FROM craters
-             WHERE nac_name=`%s`;"""%nac_name
+             FROM craters"""
+    if nac_name is not None:
+        sql += "\nWHERE nac_name='%s';"%nac_name
     cur.execute(sql)
-    data = numpy.recarray(cur.fetchall())
+    data = numpy.rec.fromrecords(cur.fetchall())
     db.close()
+    return data
 
 
-def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, flipwidth=0, nac_name='M104311715RE'):
+def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, nac_name='M104311715RE'):
     # Open output file for writing
     out = file(output_csv, 'w')
     #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
-    out.write('long, lat, xradius, yradius, angle, boulderyness, zoom, user\n')
+    out.write('long, lat, radius, axialratio, angle, boulderyness, minsize, user\n')
     # Open input file
-    if crater_csv is None:
-        f = read_db(nac_name)
+    if crater_csv.startswith('db:'):
+        db = crater_csv[3:]
+        data = read_db(nac_name.upper(), db)
     else:
-        f = file(crater_csv) 
-    # Loop over each line, send line,sample to campt
-    i = 0
-    for i, inLine in enumerate(f):
-        # Output progress
-        if i%100 == 0 and i > 0: print 'On crater %i'%i
-        # Following line is for testing on small sample
-        # if i > 10: break
-        # Get data for one object from input file
-        if crater_csv is None:
-            try:
-                fields = inLine.split(',')
-                sample, line, xdiam, ydiam, angle = [float(x) for x in fields[:5]]
-                boulderyness, zoom, user = [int(x) for x in fields[5:8]]
-            except ValueError:
-                if i == 0:
-                    continue  # probably csv file header
-                else:
-                    raise Usage("Input file in wrong format")
-        else:
-            sample, line, xdiam, ydiam, angle, boulderyness, zoom, user = inLine
-        # The 'first guess' NAC R image coordinates are flipped horizontally
-        # To solve this, ideally, the NAC coords would be fixed appropriately.
-        # However, as a fudged solution, the user may provide a width for
-        # the original NAC image, which will be used to flip the x-coord.
-        if flipwidth > 0:
-            sample = flipwidth - sample
-        # Construct command line
-        cmd = 'campt from=%s to=tmp.csv format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, line, sample)
-        #print cmd
-        status = os.system(cmd) # returns the exit status, check it
-        if status > 0:
-            raise ISISError("Execution of campt failed.")
-        # Run command and output to a temp file
-        tmp = file('tmp.csv')
-        l = tmp.readline()
-        ls = l.split(',')
-        #print [ls[x] for x in [7,9,16,17]]
-        l = tmp.readline()
-        tmp.close()
-        os.remove('tmp.csv')
-        ls = l.split(',')
-        lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
-        # The following won't work if the lat and long pixel scales are different,
-        # and it is not clear exactly what the "diameters" refer to.
-        # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
-        # or projected sizes in long and lat.
-        xradius = xdiam / 2.0
-        xradius_long = abs(xradius * cos(angle*pi/180.0) * longpixscale)
-        xradius_lat = abs(xradius * sin(angle*pi/180.0) * latpixscale)
-        xradius_metres = sqrt(xradius_long**2 + xradius_lat**2)
-        yradius = ydiam / 2.0
-        yradius_long = abs(yradius * sin(angle*pi/180.0) * longpixscale)
-        yradius_lat = abs(yradius * cos(angle*pi/180.0) * latpixscale)
-        yradius_metres = sqrt(yradius_long**2 + yradius_lat**2)
-        #out.write('%f, %f, %f, %f, %f, %f\n'%(line, sample, diam, lat, long, diam_metres))
-        out.write('%f, %f, %f, %f, %f, %i, %i, %i\n'%(long, lat, xradius_metres, yradius_metres, angle, boulderyness, zoom, user))
-    f.close()
+        data = numpy.recfromtxt(crater_csv, delimiter=',')
+    sample, line, xdiam, ydiam, angle, boulderyness, zoom, user = (data.field(n) for n in data.dtype.names)
+    # Use multiprocessing to speed things up
+    p = Pool(8)
+    result = p.map(run_campt, ((cub_file, line[i], sample[i]) for i in range(len(line))))
+    lat, long, latpixscale, longpixscale = numpy.array(result).T
+    # The following won't work if the lat and long pixel scales are different,
+    # and it is not clear exactly what the "diameters" refer to.
+    # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
+    # or projected sizes in long and lat.
+    xradius = xdiam / 2.0
+    xradius_long = numpy.abs(xradius * numpy.cos(angle*pi/180.0) * longpixscale)
+    xradius_lat = numpy.abs(xradius * numpy.sin(angle*pi/180.0) * latpixscale)
+    xradius_metres = numpy.sqrt(xradius_long**2 + xradius_lat**2)
+    yradius = ydiam / 2.0
+    yradius_long = numpy.abs(yradius * numpy.sin(angle*pi/180.0) * longpixscale)
+    yradius_lat = numpy.abs(yradius * numpy.cos(angle*pi/180.0) * latpixscale)
+    yradius_metres = numpy.sqrt(yradius_long**2 + yradius_lat**2)
+    # Flag minimum size craters
+    minsize = ((numpy.abs(xdiam - 20.0) + numpy.abs(ydiam - 20.0)) < 1.0e-5).astype(numpy.byte)
+    possize = (xradius_metres > 0) | (yradius_metres > 0)
+    axialratio = numpy.ones(xradius.shape, numpy.float)
+    axialratio[possize] = yradius_metres[possize]/xradius_metres[possize]
+    flip = axialratio > 1.0001
+    axialratio[flip] = 1.0/axialratio[flip]
+    angle[flip] = angle[flip] + 90.0
+    outarray = numpy.rec.fromarrays((long, lat, xradius_metres, axialratio, angle, boulderyness, minsize, user))
+    numpy.savetxt(out, outarray, delimiter=", ", fmt=('%.6f','%.6f','%.3f','%.3f','%.3f','%i','%i','%i'))
     out.close()
-    if i == 0:
-        raise Usage("Input file in wrong format")
+
+    
+def run_campt((cub_file, line, sample)):
+    # Construct command line
+    tmp = tempfile.NamedTemporaryFile(delete=False)
+    tmpname = tmp.name
+    tmp.close()
+    cmd = 'campt from=%s to=%s format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, tmpname, line, sample)
+    status = os.system(cmd) # returns the exit status, check it
+    if status > 0:
+        raise ISISError("Execution of campt failed.")
+    # Run command and output to a temp file
+    tmp = file(tmpname)
+    l = tmp.readline()
+    ls = l.split(',')
+    #print [ls[x] for x in [7,9,16,17]]
+    l = tmp.readline()
+    tmp.close()
+    os.remove(tmpname)
+    ls = l.split(',')
+    lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
+    return lat, long, latpixscale, longpixscale
+
 
 class Usage(Exception):
     def __init__(self, msg):
@@ -156,24 +145,20 @@ def main(argv=None):
                 return 1
             if o in ("-f", "--force"):
                 clobber = True
-        if len(args) not in (3, 4):
+        if len(args) not in (3, 4, 5):
             raise Usage("Wrong number of arguments")
         if len(args) == 3:
             crater_csv, output_csv, cub_file = args
-            flipwidth = 0
+            nac_name = ""
         elif len(args) == 4:
-            crater_csv, output_csv, cub_file, flipwidth = args
-        try:
-            flipwidth = int(flipwidth)
-        except ValueError:
-            raise Usage("Input flipwidth must be an integer: %s"%flipwidth)
-        if not os.path.exists(crater_csv):
+            crater_csv, output_csv, cub_file, nac_name = args
+        if (not crater_csv.startswith("db:")) and (not os.path.exists(crater_csv)):
             raise Usage("Input crater file does not exist: %s"%crater_csv)
         elif os.path.exists(output_csv) and (not clobber):
             raise Usage("Output file already exists: %s\nUse -f to overwrite."%output_csv)
         elif not os.path.exists(cub_file):
             raise Usage("Input cub file does not exist: %s"%cub_file)
-        pix2latlong(crater_csv, output_csv, cub_file, flipwidth)
+        pix2latlong(crater_csv, output_csv, cub_file, nac_name)
     except Usage, err:
         print >>sys.stderr, err.msg
         print >>sys.stderr, "For help use --help"
