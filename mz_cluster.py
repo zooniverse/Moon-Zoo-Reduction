@@ -22,11 +22,12 @@ from math import sqrt, pi
 import numpy
 import matplotlib
 import matplotlib.pyplot as pyplot
+from matplotlib.patches import Ellipse
 import scipy.cluster
 #import fastcluster
 
 # Some debugging tools:
-#from IPython import embed
+from IPython import embed
 #from IPython.core import ultratb
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
@@ -35,8 +36,6 @@ matplotlib.rcParams.update({'font.size': 14})
 # minimum size is still hardcoded - needs to adapt to NAC pixel scale,
 # and preferably use knowledge of zoom level of each marking
 
-#minsizes = 7.4 * numpy.array([1.0, 4.0, 8.34])
-minsizes = 14.5 * numpy.array([1.0, 4.0, 8.34])
 degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
 
 
@@ -94,99 +93,104 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     truth = None
     if expert_markings_csv is not None:
         # If 'truth' data is supplied, use it in plots
-        data = numpy.genfromtxt(expert_markings_csv, delimiter=None, names=True)
-        truth = numpy.array([data['x'], data['y'], data['RIM_DIA']])
-        datarange = (truth[0].min(), truth[0].max(), truth[1].min(), truth[1].max())
+        # robstest
+        #data = numpy.genfromtxt(expert_markings_csv, delimiter=None, names=True)
+        #truth = numpy.array([data['x'], data['y'], data['RIM_DIA']])
+        #truth['radius'] /= 2.0  # fix diameter to radius
+        # internal test
+        truth = numpy.genfromtxt(expert_markings_csv, delimiter=',', names=True)
+        datarange = (truth['long'].min(), truth['long'].max(), truth['lat'].min(), truth['lat'].max())
         print('Expert data covers region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
-        truth[2] /= 2.0  # fix diameter to radius
         if test:
             long_min, long_max, lat_min, lat_max = datarange
     # Get markings data
-    data = numpy.genfromtxt(moonzoo_markings_csv, delimiter=None, names=True)
-    #points = numpy.array([data['x'], data['y'], data['size_m']])
-    points = numpy.array([data['long'], data['lat'], data['radius'], data['axialratio'],
-                          data['angle'], data['boulderyness'], data['minsize'], data['user'])
-    datarange = (points[0].min(), points[0].max(), points[1].min(), points[1].max())
+    points = numpy.recfromtxt(moonzoo_markings_csv, delimiter=',', names=True)
+    points = points.view(numpy.ndarray)
+    datarange = (points['long'].min(), points['long'].max(), points['lat'].min(), points['lat'].max())
     print('Markings cover region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
     # Select region of interest
     print('Considering region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%(long_min, long_max, lat_min, lat_max))
-    select = (points[0] >= long_min) & (points[0] <= long_max)
-    select &= (points[1] >= lat_min) & (points[1] <= lat_max)
-    points = points[:,select]
-    if test:
-        # If this is a test we know the true clustering,
-        # which can be used to evaluate performance
-        labels_true = numpy.array(data['truelabel'], dtype=numpy.int)[select]
-    if 'minsize' in data.names:
-        minsize = numpy.array(data['minsize'], dtype=numpy.bool)[select]
-    if 'user' in data.names:
-        user = numpy.array(data['user'], dtype=numpy.int)[select]
+    select = (points['long'] >= long_min) & (points['long'] <= long_max)
+    select &= (points['lat'] >= lat_min) & (points['lat'] <= lat_max)
+    points = points[select]
     if truth is not None:
-        select = (truth[0] >= long_min) & (truth[0] <= long_max)
-        select &= (truth[1] >= lat_min) & (truth[1] <= lat_max)
-        select &= truth[2] > minsizes[0]  # remove small expert craters
-        truth = truth[:,select]
-    print('\nNumber of markings: %i'%points.shape[1])
+        select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
+        select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
+        select &= truth['radius'] > points['radius'].min()  # remove small expert craters
+        truth = truth[select]
+    print('\nNumber of markings: %i'%points.shape[0])
     if expert_markings_csv is not None:
-        print('Number of expert markings: %i'%truth.shape[1])
+        print('Number of expert markings: %i'%truth.shape[0])
     # Perform clustering of markings
-    clusters = iterative_fastclusterdata(points, threshold, maxcount, mincount, maxiter)
+    p = numpy.array([points[name] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
+    clusters = iterative_fastclusterdata(p, threshold, maxcount, mincount, maxiter)
     # Previous clustering methods:
-    ### clusters = fastclusterdata(points.transpose(), t=threshold, criterion='distance', method='single', metric=crater_metric)
-    ### clusters = dbscanclusterdata(points.transpose(), t=threshold, m=mincount, metric=crater_metric)
-    ### clusters = scipy.cluster.hierarchy.fclusterdata(points.transpose(), t=threshold, criterion='distance', method='single', metric='euclidean')
-    ### clusters = scipy.cluster.hierarchy.fclusterdata(points.transpose(), t=threshold, criterion='inconsistent', method='single', metric='euclidean')
+    ### clusters = fastclusterdata(p, t=threshold, criterion='distance', method='single', metric=crater_metric)
+    ### clusters = dbscanclusterdata(p, t=threshold, m=mincount, metric=crater_metric)
+    ### clusters = scipy.cluster.hierarchy.fclusterdata(p, t=threshold, criterion='distance', method='single', metric='euclidean')
+    ### clusters = scipy.cluster.hierarchy.fclusterdata(p, t=threshold, criterion='inconsistent', method='single', metric='euclidean')
     # Calculate clustered crater properties and useful stats
     # while eliminating clusters with too few markings
     nclusters = clusters.max()
     print('\nFound %i initial clusters'%nclusters)
-    crater_mean = numpy.zeros((3, nclusters), numpy.float)
-    crater_stdev = numpy.zeros((3, nclusters), numpy.float)
+    crater_mean = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
+    crater_stdev = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
+    crater_mean
     crater_count = numpy.zeros(nclusters, numpy.int)
+    crater_countnotmin = numpy.zeros(nclusters, numpy.int)
     dra = []
     drs = []
     ds = []
     s = []
     notmin = []
     for i in range(nclusters):
-        p = points[:,clusters == i+1]
-        crater_count[i] = p.shape[1]
-        crater_mean[:2,i] = p[:2].mean(-1)
-        notminsize = numpy.logical_not(is_minsize(p[2]))
-        if notminsize.sum() > 0:
-            crater_mean[2,i] = p[2][notminsize].mean(-1)
-        else:
-            crater_mean[2,i] = p[2].mean(-1)
-        crater_stdev[:,i] = p.std(-1)
+        p = points[clusters == i+1]
+        v = numpy.array([p[name] for name in ('long', 'lat', 'radius', 'minsize', 'axialratio', 'angle', 'boulderyness')], dtype=numpy.double)
+        crater_count[i] = p.shape[0]
+        crater_mean[i] = v.mean(-1)
+        crater_stdev[i] = v.std(-1)
+        notminsize = numpy.logical_not(p['minsize'])
+        crater_countnotmin[i] = notminsize.sum()
+        if crater_countnotmin[i] > 0:
+            crater_mean['radius'][i] = p['radius'][notminsize].mean()
+            crater_stdev['radius'][i] = p['radius'][notminsize].std()
         if crater_count[i] >= mincount:
-            dra.extend(crater_absolute_position_metric(p, crater_mean[:,i]))
-            drs.extend(crater_position_metric(p, crater_mean[:,i]))
-            ds.extend(crater_size_metric(p, crater_mean[:,i]))
-            s.extend([crater_mean[2,i]]*crater_count[i])
+            crater_mean['minsize'][i] = 0
+            m = numpy.array([crater_mean[name][i] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
+            dra.extend(crater_absolute_position_metric(v, m))
+            drs.extend(crater_position_metric(v, m))
+            ds.extend(crater_size_metric(v, m))
+            s.extend([crater_mean['radius'][i]]*crater_count[i])
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
     # select final craters (should we also remove minsize craters?)
     ok = crater_count >= mincount
     crater_count = crater_count[ok]
-    crater_mean = crater_mean[:,ok]
-    crater_stdev = crater_stdev[:,ok]
+    crater_countnotmin = crater_countnotmin[ok]
+    crater_mean = crater_mean[ok]
+    crater_stdev = crater_stdev[ok]
+    crater_mean = crater_mean[['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
+    crater_stdev = crater_stdev[['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
     print('Found %i final clusters'%len(crater_count))
     # Write final crater catalogue to a csv file
     fout = open(output_filename_base+'_craters.csv', 'w')
-    fout.write('long,long_err,lat,lat_err,radius,radius_err\n')
-    for i in range(len(crater_count)):
-        x = (crater_mean[0,i], crater_stdev[0,i], crater_mean[1,i], crater_stdev[1,i],
-             crater_mean[2,i], crater_stdev[2,i])
-        fout.write('%.6f,%.6f,%.6f,%.6f,%.2f,%.2f\n'%x)
+    fout.write('long,long_std,lat,lat_std,radius,radius_std,axialratio,axialratio_std,angle,angle_std,boulderyness,boulderyness_std,count,countnotmin\n')
+    outarray = numpy.zeros((14, crater_mean.shape[0]), numpy.float)
+    outarray[:-2:2] = crater_mean
+    outarray[1:-2:2] = crater_stdev
+    outarray[-2] = crater_count
+    outarray[-2] = crater_countnotmin
+    numpy.savetxt(fout, outarray.T, delimiter=", ", fmt='%.6f')
     fout.close()
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
     plot_crater_stats(crater_mean, truth, output_filename_base)
     plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
-    # If this is a test, calculate some metrics
+    # If this is a test we know the true clustering, which can be used to evaluate performance
     if test:
         from sklearn import metrics
+        labels_true = points['truelabel']
         print
         print("Homogeneity: %0.3f" % metrics.homogeneity_score(labels_true, clusters))
         print("Completeness: %0.3f" % metrics.completeness_score(labels_true, clusters))
@@ -197,17 +201,6 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
               % metrics.adjusted_mutual_info_score(labels_true, clusters))
     print
     return crater_count
-
-
-def is_minsize(r):
-    # this is rough, can do better if know zoom level
-    out = None
-    for m in minsizes:
-        if out is None:
-            out = numpy.abs(r - m)/m < 0.01
-        else:
-            out |= numpy.abs(r - m)/m < 0.01
-    return out
 
 
 def crater_metric(uin, vin):
@@ -221,8 +214,8 @@ def crater_metric(uin, vin):
 
 def crater_absolute_position_metric(uin, vin):
     # get coords
-    x1, y1, s1 = uin
-    x2, y2, s2 = vin
+    x1, y1, s1 = uin[:3]
+    x2, y2, s2 = vin[:3]
     # calculate crater position difference
     dr = numpy.sqrt((x2-x1)**2 + (y2-y1)**2) / degrees_per_metre
     return dr
@@ -230,8 +223,8 @@ def crater_absolute_position_metric(uin, vin):
 
 def crater_position_metric(uin, vin):
     # get coords
-    x1, y1, s1 = uin
-    x2, y2, s2 = vin
+    x1, y1, s1 = uin[:3]
+    x2, y2, s2 = vin[:3]
     # calculate mean crater size
     sm = (s1 + s2)/2.0
     # calculate crater position difference
@@ -241,29 +234,32 @@ def crater_position_metric(uin, vin):
 
 def crater_size_metric(uin, vin):
     # get coords
-    x1, y1, s1 = uin
-    x2, y2, s2 = vin
+    x1, y1, s1, m1 = uin[:4]
+    x2, y2, s2, m2 = vin[:4]
     # calculate crater size difference
     sm = (s1 + s2)/2.0
-    ds = numpy.where(is_minsize(s1)|is_minsize(s2), 0.0,  numpy.abs(s1 - s2) / sm)
+    neither_minsize = (1-m1) * (1-m2)
+    ds = neither_minsize * numpy.abs(s1 - s2) / sm
     return ds
 
 
 def draw_craters(points, c='r', lw=1, ls='solid'):
-    for (x, y, r) in points.transpose():
-        circle=pyplot.Circle((x, y), r*degrees_per_metre, color=c, fill=False, lw=lw, ls=ls, alpha=0.5)
+    for p in points:
+        x, y, r, q, theta, b = [p[name] for name in ['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
+        crater = Ellipse((x, y), width=r*degrees_per_metre, height=q*r*degrees_per_metre, angle=theta,
+                         color=c, fill=False, lw=lw, ls=ls, alpha=0.5)
         fig = pyplot.gcf()
-        fig.gca().add_artist(circle)
+        fig.gca().add_artist(crater)
     pyplot.xlabel('long')
     pyplot.ylabel('lat')
     
 
-def make_test_craters(ncraters=10, nobs=10, pmin=0.2, pwrong=0.2):
+def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.1):
     scale = numpy.sqrt(ncraters/10.0) * 100
     # true craters
-    cx = numpy.random.normal(scale, scale/2.0, size=ncraters)
-    cy = numpy.random.normal(scale, scale/2.0, size=ncraters)
-    cr = numpy.random.uniform(minsizes[0], scale/5.0, size=ncraters)
+    cx = numpy.random.normal(scale*2, scale, size=ncraters)
+    cy = numpy.random.normal(scale*2, scale, size=ncraters)
+    cr = numpy.random.uniform(7.4, scale/2.0, size=ncraters)
     # test craters
     x = numpy.zeros(ncraters*nobs, numpy.float)
     y = numpy.zeros(ncraters*nobs, numpy.float)
@@ -271,31 +267,31 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.2, pwrong=0.2):
     truelabel = numpy.zeros(ncraters*nobs, numpy.int)
     flag = numpy.zeros(ncraters*nobs, numpy.int)
     for i in range(nobs):
-        x[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cx, numpy.sqrt(cr)/5.0)
-        y[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cy, numpy.sqrt(cr)/5.0)
-        r[i*ncraters:(i+1)*ncraters] = numpy.maximum(numpy.random.normal(cr, cr/20.0), minsizes[0])
+        x[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cx, numpy.sqrt(cr)/3.0)
+        y[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cy, numpy.sqrt(cr)/3.0)
+        r[i*ncraters:(i+1)*ncraters] = numpy.maximum(numpy.random.normal(cr, cr/10.0), 7.4)
         truelabel[i*ncraters:(i+1)*ncraters] = numpy.arange(ncraters)+1
         for j in range(ncraters):
             # some of the time get the position completely wrong
             if numpy.random.random() < pwrong:
-                x[i*ncraters+j], y[i*ncraters+j] = numpy.random.normal(scale, scale/2.0, size=2)
-                flag[i*ncraters+j] = 2
+                x[i*ncraters+j], y[i*ncraters+j] = numpy.random.normal(scale*2, scale, size=2)
+                flag[i*ncraters+j] = 0
                 truelabel[i*ncraters+j] = 0
             # some of the time set the crater to a minimum size
             if numpy.random.random() < pmin:
-                r[i*ncraters+j] = minsizes[0]
+                r[i*ncraters+j] = 7.4
                 flag[i*ncraters+j] = 1
     # convert x,y in metres into long,lat
     x, y, cx, cy = numpy.multiply((x, y, cx, cy), degrees_per_metre)
     f = file('truthcraters.csv', 'w')
-    f.write('long,lat,radius\n')
+    f.write('long,lat,radius,axialratio,angle,boulderyness\n')
     for i in range(len(cx)):
-        f.write('%f,%f,%f\n'%(cx[i], cy[i], cr[i]))
+        f.write('%f,%f,%f,%f,%f,%i\n'%(cx[i], cy[i], cr[i], 1.0, 0.0, 0))
     f.close()        
     f = file('testcraters.csv', 'w')
-    f.write('long,lat,radius,flag,truelabel\n')
+    f.write('long,lat,radius,axialratio,angle,boulderyness,minsize,truelabel\n')
     for i in range(len(x)):
-        f.write('%f,%f,%f,%i,%i\n'%(x[i], y[i], r[i], flag[i], truelabel[i]))
+        f.write('%f,%f,%f,%i,%f,%f,%i,%i\n'%(x[i], y[i], r[i], 1.0, 0.0, 0, flag[i], truelabel[i]))
     f.close()        
     #numpy.savetxt("testcraters.csv", p.transpose(), delimiter=",")
 
@@ -352,7 +348,7 @@ def iterative_fastclusterdata(points, threshold, maxcount, mincount, maxiter):
         newclusters = 0
         while i <= nclusters - newclusters:
             selectedpoints = clusters == i
-            p = points[:,selectedpoints]            
+            p = points[:,selectedpoints]
             if p.shape[1] > maxcount:
                 if not largeclustersflag:
                     print('\nIteration %i, threshold %.3f'%(iteration, threshold))
@@ -429,10 +425,10 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     
 def plot_crater_stats(crater_mean, truth, output_filename_base):
     pyplot.figure(figsize=(6., 8.))
-    sf_bins_clust, sf_clust = plot_sizefreq(crater_mean[2], label='clustered')
+    sf_bins_clust, sf_clust = plot_sizefreq(crater_mean['radius'], label='clustered')
     if truth is not None:
         print
-        sf_bins_truth, sf_truth = plot_sizefreq(truth[2], sf_bins_clust, label='truth')
+        sf_bins_truth, sf_truth = plot_sizefreq(truth['radius'], sf_bins_clust, label='truth')
         ok = (sf_clust > 0) & (sf_truth > 0)
         delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
         text = 'mean_delta = %.3f'%delta.mean()
@@ -465,16 +461,16 @@ def plot_sizefreq(size, bins=10000, label=''):
 def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base):
     pyplot.figure()
     ax = pyplot.subplot(111)
-    radius_min, radius_max = (points[2].min(), points[2].max())
+    radius_min, radius_max = (points['radius'].min(), points['radius'].max())
     radius_range = radius_max - radius_min
     radius_min /= 2.0
     radius_max *= 2.0
     log10radius_min, log10radius_max = numpy.log10((radius_min, radius_max))
     ax.set_xlim(long_min, long_max)
     ax.set_ylim(lat_min, lat_max)
-    msel = is_minsize(points[2])
-    draw_craters(points[:,msel], c='r', lw=0.25)
-    draw_craters(points[:,numpy.logical_not(msel)], c='r', lw=0.5)
+    msel = points['minsize'].astype(numpy.bool)
+    draw_craters(points[msel], c='r', lw=0.25)
+    draw_craters(points[numpy.logical_not(msel)], c='r', lw=0.5)
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
@@ -484,31 +480,31 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
 def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base):
     pyplot.figure(figsize=(12.,6.))
     ax = pyplot.subplot(131)
-    radius_min, radius_max = (points[2].min(), points[2].max())
+    radius_min, radius_max = (points['radius'].min(), points['radius'].max())
     radius_range = radius_max - radius_min
     radius_min /= 2.0
     radius_max *= 2.0
     log10radius_min, log10radius_max = numpy.log10((radius_min, radius_max))
 
-    pyplot.plot(crater_mean[0], crater_mean[1], 'o', markersize=4,
+    pyplot.plot(crater_mean['long'], crater_mean['lat'], 'o', markersize=4,
                 mfc='white', mec='blue')
-    pyplot.plot(points[0], points[1], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
+    pyplot.plot(points['long'], points['lat'], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('long')
     pyplot.ylabel('lat')
     ax.set_xlim(long_min, long_max)
     ax.set_ylim(lat_min, lat_max)
     ax = pyplot.subplot(132)
-    pyplot.plot(crater_mean[0], numpy.log10(crater_mean[2]), 'o', markersize=4,
+    pyplot.plot(crater_mean['long'], numpy.log10(crater_mean['radius']), 'o', markersize=4,
                 mfc='white', mec='blue')
-    pyplot.plot(points[0], numpy.log10(points[2]), '.', mfc='red', mec='red', alpha=0.25, markersize=2)
+    pyplot.plot(points['long'], numpy.log10(points['radius']), '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('long')
     pyplot.ylabel('log10(radius)')
     ax.set_xlim(long_min, long_max)
     ax.set_ylim(log10radius_min, log10radius_max)
     ax = pyplot.subplot(133)
-    pyplot.plot(numpy.log10(crater_mean[2]), crater_mean[1], 'o', markersize=4,
+    pyplot.plot(numpy.log10(crater_mean['radius']), crater_mean['lat'], 'o', markersize=4,
                 mfc='white', mec='blue')
-    pyplot.plot(numpy.log10(points[2]), points[1], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
+    pyplot.plot(numpy.log10(points['radius']), points['lat'], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('log10(radius)')
     pyplot.ylabel('lat')
     ax.set_xlim(log10radius_min, log10radius_max)
