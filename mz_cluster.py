@@ -44,7 +44,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
                threshold=1.0, mincount=2, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.05,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
-    #long_min=30.657, long_max=30.798, lat_min=20.122, lat_max=20.265):
+    #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
     """Runs clustering routine.
 
     This reads in all the data, clusters the markings, selects
@@ -79,7 +79,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     print('*** Start of mz_cluster ***\n')
     print('output_filename_base = %s\nmoonzoo_markings_csv = %s\nexpert_markings_csv = %s'%(output_filename_base, moonzoo_markings_csv, expert_markings_csv))
     print('threshold = %f\nmincount = %i\nmaxcount = %i\nmaxiter = %i'%(threshold, mincount, maxcount, maxiter))
-    print('position_scale = %f\nsize_scale = %f'%(position_scale, size_scale))
+    print('position_scale = %f\nsize_scale = %f\nmin_user_weight = %f'%(position_scale, size_scale, min_user_weight))
     print
     # set global variables for crater metric
     global pscale, sscale
@@ -120,7 +120,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     select &= user_weights > min_user_weight
     # Filter by user weight
     points = points[select]
-    weights = weights[select]
+    user_weights = user_weights[select]
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
@@ -141,8 +141,6 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     # while eliminating clusters with too few markings
     nclusters = clusters.max()
     print('\nFound %i initial clusters'%nclusters)
-    # Get user weights
-    weights = get_user_weights(points['user'])
     crater_mean = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
     crater_stdev = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
     crater_count = numpy.zeros(nclusters, numpy.int)
@@ -157,7 +155,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
         p = points[clusters == i+1]
         v = numpy.array([p[name] for name in ('long', 'lat', 'radius', 'minsize', 'axialratio', 'angle', 'boulderyness')], dtype=numpy.double)
         crater_count[i] = p.shape[0]
-        crater_score[i] = weights[clusters == i+1].sum()
+        crater_score[i] = user_weights[clusters == i+1].sum()
         crater_mean[i] = v.mean(-1)
         crater_stdev[i] = v.std(-1)
         notminsize = numpy.logical_not(p['minsize'])
@@ -165,6 +163,14 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
         if crater_countnotmin[i] > 0:
             crater_mean['radius'][i] = p['radius'][notminsize].mean()
             crater_stdev['radius'][i] = p['radius'][notminsize].std()
+            crater_mean['axialratio'][i] = p['axialratio'][notminsize].mean()
+            crater_stdev['axialratio'][i] = p['axialratio'][notminsize].std()
+            crater_mean['angle'][i] = p['angle'][notminsize].mean()
+            crater_stdev['angle'][i] = p['angle'][notminsize].std()
+        bouldery = p['boulderyness'] > 0
+        if bouldery.sum() > 0:
+            crater_mean['boulderyness'][i] = p['boulderyness'][bouldery].mean()
+            crater_stdev['boulderyness'][i] = p['boulderyness'][bouldery].std()
         if crater_count[i] >= mincount:
             crater_mean['minsize'][i] = 0
             m = numpy.array([crater_mean[name][i] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
@@ -221,15 +227,18 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
 
 def get_user_weights(userids, db='moonzoo'):
     import pymysql
-    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
-    cur = db.cursor() 
-    sql = """SELECT zooniverse_user_id, weight
-             FROM user_weights"""
-    cur.execute(sql)
-    data = numpy.rec.fromrecords(cur.fetchall())
-    db.close()
-    match = matchids(data['f0'], userids.astype(numpy.int))
-    return data['f1'][match]
+    if (userids == 0).all():
+        return numpy.ones(len(userids), numpy.float)
+    else:
+        db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+        cur = db.cursor() 
+        sql = """SELECT zooniverse_user_id, weight
+                 FROM user_weights"""
+        cur.execute(sql)
+        data = numpy.rec.fromrecords(cur.fetchall())
+        db.close()
+        match = matchids(data['f0'], userids.astype(numpy.int))
+        return data['f1'][match]
 
 
 def matchids(id1,id2):
@@ -310,12 +319,12 @@ def draw_craters(points, c='r', lw=1, ls='solid'):
     pyplot.ylabel('lat')
     
 
-def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.1):
+def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.15):
     scale = numpy.sqrt(ncraters/10.0) * 100
     # true craters
-    cx = numpy.random.normal(scale*2, scale, size=ncraters)
-    cy = numpy.random.normal(scale*2, scale, size=ncraters)
-    cr = numpy.random.uniform(7.4, scale/2.0, size=ncraters)
+    cx = numpy.random.normal(scale*4, scale*2, size=ncraters)
+    cy = numpy.random.normal(scale*4, scale*2, size=ncraters)
+    cr = numpy.random.uniform(7.4, scale/3.0, size=ncraters)
     # test craters
     x = numpy.zeros(ncraters*nobs, numpy.float)
     y = numpy.zeros(ncraters*nobs, numpy.float)
@@ -323,14 +332,14 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.1):
     truelabel = numpy.zeros(ncraters*nobs, numpy.int)
     flag = numpy.zeros(ncraters*nobs, numpy.int)
     for i in range(nobs):
-        x[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cx, numpy.sqrt(cr)/3.0)
-        y[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cy, numpy.sqrt(cr)/3.0)
-        r[i*ncraters:(i+1)*ncraters] = numpy.maximum(numpy.random.normal(cr, cr/10.0), 7.4)
+        x[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cx, numpy.sqrt(cr)/1.0)
+        y[i*ncraters:(i+1)*ncraters] = numpy.random.normal(cy, numpy.sqrt(cr)/1.0)
+        r[i*ncraters:(i+1)*ncraters] = numpy.maximum(numpy.random.normal(cr, cr/5.0), 7.4)
         truelabel[i*ncraters:(i+1)*ncraters] = numpy.arange(ncraters)+1
         for j in range(ncraters):
             # some of the time get the position completely wrong
             if numpy.random.random() < pwrong:
-                x[i*ncraters+j], y[i*ncraters+j] = numpy.random.normal(scale*2, scale, size=2)
+                x[i*ncraters+j], y[i*ncraters+j] = numpy.random.normal(scale*4, scale*2, size=2)
                 flag[i*ncraters+j] = 0
                 truelabel[i*ncraters+j] = 0
             # some of the time set the crater to a minimum size
@@ -345,9 +354,9 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.1):
         f.write('%f,%f,%f,%f,%f,%i\n'%(cx[i], cy[i], cr[i], 1.0, 0.0, 0))
     f.close()        
     f = file('testcraters.csv', 'w')
-    f.write('long,lat,radius,axialratio,angle,boulderyness,minsize,truelabel\n')
+    f.write('long,lat,radius,axialratio,angle,boulderyness,minsize,user,truelabel\n')
     for i in range(len(x)):
-        f.write('%f,%f,%f,%i,%f,%f,%i,%i\n'%(x[i], y[i], r[i], 1.0, 0.0, 0, flag[i], truelabel[i]))
+        f.write('%f,%f,%f,%i,%f,%f,%i,%i,%i\n'%(x[i], y[i], r[i], 1.0, 0.0, 0, flag[i], 0, truelabel[i]))
     f.close()        
     #numpy.savetxt("testcraters.csv", p.transpose(), delimiter=",")
 
