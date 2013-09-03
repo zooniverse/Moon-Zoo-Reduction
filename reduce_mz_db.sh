@@ -5,13 +5,15 @@
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils
+sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables
 sudo apt-get -y install mysql-server
+sudo pip install pymysql
 
 # If need ISIS:
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
 cd /mnt
-mkdir isis3
+sudo mkdir isis3
+sudo chown -R ubuntu:ubuntu /mnt/isis3
 cd isis3
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::x86-64_linux_UBUNTU/isis .
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/base data/
@@ -19,7 +21,7 @@ rsync -az --exclude='kernels' --delete --partial isisdist.astrogeology.usgs.gov:
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/tspk data/lro/kernels/
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/pck data/lro/kernels/
 echo '
-export ISISROOT=/work1/isis3/isis
+export ISISROOT=/mnt/isis3/isis
 . $ISISROOT/scripts/isis3Startup.sh
 ' >> ~/.profile
 
@@ -81,25 +83,31 @@ select * from mzslices;' | sqlite3 MZP_A12.db
 cat mzimages_a12.csv >> mzimages.csv
 cat mzslices_a12.csv >> mzslices.csv
 
-cat reduce_mz_db.sql | mysql -uroot moonzoo &> reduce_mz_db.sql.out
+cat reduce_mz_db.sql | mysql -uroot moonzoo &> reduce_mz_db.sql.out &
 
-python reduce_mz_db.py &> reduce_mz_db.py.out  # actually done function by function last time
+ln -s /mnt/csv/mz_results*csv /mnt/moonzoo/
+
+python reduce_mz_db.py &> reduce_mz_db.py.out & # actually done function by function last time
 
 cat read_reduced_mz_tables.sql | mysql -uroot moonzoo &> read_reduced_mz_tables.sql.out
 
-wget -OMZP_v10.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log.gz
+wget -OMZP_v10_1.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log_2010-04-14T00:47:34.gz
+wget -OMZP_v10_2.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log_2010-04-16T00:47:06.gz
+wget -OMZP_v10_3.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log.gz
 wget -OMZP_v21.log.gz http://moonzoo.s3.amazonaws.com/v21/logs/MZP.log.gz
 wget -OMZP_v23.log.gz http://moonzoo.s3.amazonaws.com/v23/logs/MZP.log.gz
 gunzip MZP*log.gz
 cat MZP*log > MZP.log
-grep 'Attempting to retrieve URL' MZP.log | head | colrm 1 62 | sort | uniq > nac_urls
+grep 'Attempting to retrieve URL' MZP.log | colrm 1 62 | sort | uniq > nac_urls
 
 cp nac_urls selected_nac_urls
 
 # edit selected_nac_urls to only select those nacs interested in
 
 mkdir img
+cd img
 wget -i selected_nac_urls
+cd ..
 
 ls img | colrm 13 > selected_nacs
 
@@ -108,7 +116,7 @@ cat selected_nacs | xargs -I{} lronac2isis from=img/{}.IMG to=tmp/{}.cub
 mkdir cub
 cat selected_nacs | xargs -I{} lronaccal from=tmp/{}.cub to=cub/{}.cub
 rm -rf tmp
-cat selected_nacs | xargs -I{} spiceinit from=cub/{}.cub
+cat selected_nacs | xargs -I{} spiceinit web=yes from=cub/{}.cub
 mkdir fits
 cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
 
