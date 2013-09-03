@@ -43,23 +43,24 @@ from multiprocessing import Pool
 # campt.cpp to read a list of line,sample and output a list of long,lat.
 # The ISIS3 source code is all available at "rsync isisdist.astrogeology.usgs.gov::"
 
-def read_db(nac_name='M104311715RE', db='moonzoo'):
+def read_db(nac_name, db='moonzoo'):
     import pymysql
-    # not yet tested...
     db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
     cur = db.cursor() 
     sql = """SELECT xnac, ynac, x_diameter_nac, y_diameter_nac, 
-                    angle_nac, boulderyness, zoom, zooniverse_user_id
-             FROM craters"""
+                    angle, boulderyness, zoom, zooniverse_user_id
+             FROM craters as C, classification_stats as S
+             WHERE C.classification_id = S.classification_id
+             AND S.count < 25"""
     if nac_name is not None:
-        sql += "\nWHERE nac_name='%s';"%nac_name
+        sql += "\nAND nac_name='%s';"%nac_name
     cur.execute(sql)
     data = numpy.rec.fromrecords(cur.fetchall())
     db.close()
     return data
 
 
-def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, nac_name='M104311715RE'):
+def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, nac_name=""):
     # Open output file for writing
     out = file(output_csv, 'w')
     #out.write('x_pix, y_pix, size_pix, lat, long, size_metres\n')
@@ -106,13 +107,16 @@ def run_campt((cub_file, line, sample)):
     tmpname = tmp.name
     tmp.close()
     cmd = 'campt from=%s to=%s format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, tmpname, line, sample)
+    print cmd
     status = os.system(cmd) # returns the exit status, check it
     if status > 0:
         raise ISISError("Execution of campt failed.")
     # Run command and output to a temp file
     tmp = file(tmpname)
-    l = tmp.readline()
-    ls = l.split(',')
+    #l = tmp.readline()
+    #print l
+    #ls = l.split(',')
+    #print ls
     #print [ls[x] for x in [7,9,16,17]]
     l = tmp.readline()
     tmp.close()

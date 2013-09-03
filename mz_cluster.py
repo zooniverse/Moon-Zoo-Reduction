@@ -7,7 +7,7 @@
     Usage:
         mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <expert_markings_csv>
                       <threshold> <mincount> <maxcount> <maxiter> <position_scale> <size_scale>
-                      <long_min> <long_max> <lat_min> <lat_max>
+                      <min_user_weight> <long_min> <long_max> <lat_min> <lat_max>
 
     Note that the csv files must contain column headers, including 'long', 'lat' and 'xradius'.
     
@@ -21,13 +21,14 @@ from string import strip
 from math import sqrt, pi
 import numpy
 import matplotlib
+matplotlib.use('PDF')
 import matplotlib.pyplot as pyplot
 from matplotlib.patches import Ellipse
 import scipy.cluster
 #import fastcluster
 
 # Some debugging tools:
-from IPython import embed
+#from IPython import embed
 #from IPython.core import ultratb
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
@@ -41,8 +42,9 @@ degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
 
 def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, expert_markings_csv=None,
                threshold=1.0, mincount=2, maxcount=10, maxiter=3,
-               position_scale=4.0, size_scale=0.4,
-               long_min=30.657, long_max=30.798, lat_min=20.122, lat_max=20.265):
+               position_scale=4.0, size_scale=0.4, min_user_weight=0.05,
+               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
+    #long_min=30.657, long_max=30.798, lat_min=20.122, lat_max=20.265):
     """Runs clustering routine.
 
     This reads in all the data, clusters the markings, selects
@@ -65,6 +67,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     position_scale -- maximum positional difference for linking two markings,
                       normalised by the square root of the crater size
     size_scale -- maximum fractional size difference for linking two markings
+    min_user_weight -- minimum user weight to be included at all
     long_min, long_max, lat_min, lat_max -- limits of region to consider
 
     This could incorporate user weighting in future, e.g. by assigning
@@ -112,7 +115,12 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     print('Considering region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%(long_min, long_max, lat_min, lat_max))
     select = (points['long'] >= long_min) & (points['long'] <= long_max)
     select &= (points['lat'] >= lat_min) & (points['lat'] <= lat_max)
+    # Get user weights
+    user_weights = get_user_weights(points['user'])
+    select &= user_weights > min_user_weight
+    # Filter by user weight
     points = points[select]
+    weights = weights[select]
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
@@ -133,10 +141,12 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     # while eliminating clusters with too few markings
     nclusters = clusters.max()
     print('\nFound %i initial clusters'%nclusters)
+    # Get user weights
+    weights = get_user_weights(points['user'])
     crater_mean = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
     crater_stdev = numpy.zeros(nclusters, [('long', numpy.float), ('lat', numpy.float), ('radius', numpy.float), ('minsize', numpy.float), ('axialratio', numpy.float), ('angle', numpy.float), ('boulderyness', numpy.float)])
-    crater_mean
     crater_count = numpy.zeros(nclusters, numpy.int)
+    crater_score = numpy.zeros(nclusters, numpy.float)
     crater_countnotmin = numpy.zeros(nclusters, numpy.int)
     dra = []
     drs = []
@@ -147,6 +157,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
         p = points[clusters == i+1]
         v = numpy.array([p[name] for name in ('long', 'lat', 'radius', 'minsize', 'axialratio', 'angle', 'boulderyness')], dtype=numpy.double)
         crater_count[i] = p.shape[0]
+        crater_score[i] = weights[clusters == i+1].sum()
         crater_mean[i] = v.mean(-1)
         crater_stdev[i] = v.std(-1)
         notminsize = numpy.logical_not(p['minsize'])
@@ -164,7 +175,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
     # select final craters (should we also remove minsize craters?)
-    ok = crater_count >= mincount
+    ok = crater_score >= mincount
+    crater_score = crater_score[ok]
     crater_count = crater_count[ok]
     crater_countnotmin = crater_countnotmin[ok]
     crater_mean = crater_mean[ok]
@@ -174,14 +186,18 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
     print('Found %i final clusters'%len(crater_count))
     # Write final crater catalogue to a csv file
     fout = open(output_filename_base+'_craters.csv', 'w')
-    fout.write('long,long_std,lat,lat_std,radius,radius_std,axialratio,axialratio_std,angle,angle_std,boulderyness,boulderyness_std,count,countnotmin\n')
-    outarray = numpy.zeros((14, crater_mean.shape[0]), numpy.float)
-    outarray[:-2:2] = crater_mean
-    outarray[1:-2:2] = crater_stdev
+    fout.write('long,long_std,lat,lat_std,radius,radius_std,axialratio,axialratio_std,angle,angle_std,boulderyness,boulderyness_std,score,count,countnotmin\n')
+    outarray = numpy.zeros((15, crater_mean.shape[0]), numpy.float)
+    outarray[:-3:2] = [crater_mean[n] for n in crater_mean.dtype.names]
+    outarray[1:-3:2] = [crater_stdev[n] for n in crater_stdev.dtype.names]
+    outarray[-3] = crater_score
     outarray[-2] = crater_count
-    outarray[-2] = crater_countnotmin
+    outarray[-1] = crater_countnotmin
     numpy.savetxt(fout, outarray.T, delimiter=", ", fmt='%.6f')
     fout.close()
+    if truth is not None:
+        matchval = compare(crater_mean, truth)
+        print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
     plot_crater_stats(crater_mean, truth, output_filename_base)
@@ -201,6 +217,46 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv=None, ex
               % metrics.adjusted_mutual_info_score(labels_true, clusters))
     print
     return crater_count
+    
+
+def get_user_weights(userids, db='moonzoo'):
+    import pymysql
+    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+    cur = db.cursor() 
+    sql = """SELECT zooniverse_user_id, weight
+             FROM user_weights"""
+    cur.execute(sql)
+    data = numpy.rec.fromrecords(cur.fetchall())
+    db.close()
+    match = matchids(data['f0'], userids.astype(numpy.int))
+    return data['f1'][match]
+
+
+def matchids(id1,id2):
+    """ Match two sets of ids. 
+        Returns: 
+          ibest -- array of indices of i1 that match i2; -1 if no match
+    """
+    indices = numpy.argsort(id1)
+    idsorted = id1[indices]
+    ibest = []
+    for i in range(len(id2)):
+        j = matchidsorted(idsorted,id2[i])
+        if j < 0:
+            ibest += [j]
+        else:
+            ibest += [indices[j]]
+    return numpy.array(ibest)
+
+
+def matchidsorted(ids,targetid):
+    """ Find id matches, return index in i1 that matches targetid; -1 if no match. """
+    i1 = numpy.searchsorted(ids,targetid)
+    if targetid == ids[i1]:
+        ibest = i1
+    else:
+        ibest = -1 
+    return ibest
 
 
 def crater_metric(uin, vin):
@@ -246,7 +302,7 @@ def crater_size_metric(uin, vin):
 def draw_craters(points, c='r', lw=1, ls='solid'):
     for p in points:
         x, y, r, q, theta, b = [p[name] for name in ['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
-        crater = Ellipse((x, y), width=r*degrees_per_metre, height=q*r*degrees_per_metre, angle=theta,
+        crater = Ellipse((x, y), width=2*r*degrees_per_metre, height=2*q*r*degrees_per_metre, angle=theta,
                          color=c, fill=False, lw=lw, ls=ls, alpha=0.5)
         fig = pyplot.gcf()
         fig.gca().add_artist(crater)
@@ -296,8 +352,32 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.1):
     #numpy.savetxt("testcraters.csv", p.transpose(), delimiter=",")
 
 
-def fastclusterdata(X, t, criterion='inconsistent', \
-                 metric='euclidean', depth=2, method='single', R=None):
+def find_offset(p1, p2):
+    minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
+    minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
+    X1 = numpy.asarray([p1[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
+    X2 = numpy.asarray([p2[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
+    results = fmin(comparedata, [0.0, 0.0], args=(X1, X2))
+    return results[0]
+
+
+def compare(p1, p2):
+    minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
+    minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
+    X1 = numpy.asarray([p1[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
+    X2 = numpy.asarray([p2[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
+    return comparedata([0.0, 0.0], X1, X2)
+
+
+def comparedata(shift, X1, X2, metric=crater_metric):
+    dX = numpy.zeros((X1.shape[0],1), numpy.double)
+    dX[:2,0] = shift
+    Y = scipy.cluster.hierarchy.distance.cdist(X1.T, (X2+dX).T, metric=metric)
+    M = Y.min(numpy.argmax(Y.shape)).mean()
+    return M
+
+
+def fastclusterdata(X, t, criterion='distance', metric=crater_metric, method='single'):
     """
     scipy.cluster.hierarchy.fclusterdata modified to use fastcluster
     """
@@ -310,15 +390,11 @@ def fastclusterdata(X, t, criterion='inconsistent', \
     Y = scipy.cluster.hierarchy.distance.pdist(X, metric=metric)
     #Z = fastcluster.linkage(Y, method=method)
     Z = scipy.cluster.hierarchy.linkage(Y, method=method)
-    if R is None:
-        R = scipy.cluster.hierarchy.inconsistent(Z, d=depth)
-    else:
-        R = numpy.asarray(R, order='c')
-    T = scipy.cluster.hierarchy.fcluster(Z, criterion=criterion, depth=depth, R=R, t=t)
+    T = scipy.cluster.hierarchy.fcluster(Z, criterion=criterion, t=t)
     return T
 
 
-def dbscanclusterdata(X, t, m, metric='euclidean'):
+def dbscanclusterdata(X, t, m, metric=crater_metric):
     """
     Attempt at using sklearn.DBSCAN - but no faster than fastcluster
     """
@@ -386,7 +462,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.plot(x, x*0+0.4, '-')
     pyplot.xlabel('size')
     pyplot.ylabel('ds')
-    pyplot.savefig(output_filename_base+'_size_ds.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_size_ds.pdf', dpi=300)
     pyplot.close()
     #
     pyplot.figure()
@@ -394,7 +470,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.plot(x, x*0+4.0, '-')
     pyplot.xlabel('size')
     pyplot.ylabel('drs')
-    pyplot.savefig(output_filename_base+'_size_drs.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_size_drs.pdf', dpi=300)
     pyplot.close()
     #
     pyplot.figure()
@@ -402,7 +478,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.plot(x, 4.0*numpy.sqrt(x), '-')
     pyplot.xlabel('size')
     pyplot.ylabel('dra')
-    pyplot.savefig(output_filename_base+'_size_dra.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_size_dra.pdf', dpi=300)
     pyplot.close()
     #
     pyplot.figure()
@@ -411,7 +487,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.vlines(0.4, 0, pyplot.axis()[3])
     pyplot.axis(ymin=0)
     pyplot.xlabel('ds')
-    pyplot.savefig(output_filename_base+'_hist_ds.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_hist_ds.pdf', dpi=300)
     pyplot.close()
     #
     pyplot.figure()
@@ -419,7 +495,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.vlines(4.0, 0, pyplot.axis()[3])
     pyplot.axis(ymin=0)
     pyplot.xlabel('drs')
-    pyplot.savefig(output_filename_base+'_hist_drs.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_hist_drs.pdf', dpi=300)
     pyplot.close()
 
     
@@ -444,7 +520,7 @@ def plot_crater_stats(crater_mean, truth, output_filename_base):
     pyplot.xlabel('log10(radius [m])')
     pyplot.ylabel('cumulative frequency')
     pyplot.legend(loc='lower left')
-    pyplot.savefig(output_filename_base+'_sizefreq.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_sizefreq.pdf', dpi=300)
     pyplot.close()
 
 
@@ -474,7 +550,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
-    pyplot.savefig(output_filename_base+'_craters.png', dpi=300)
+    pyplot.savefig(output_filename_base+'_craters.pdf', dpi=300)
 
     
 def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base):
@@ -510,7 +586,7 @@ def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat
     ax.set_xlim(log10radius_min, log10radius_max)
     ax.set_ylim(lat_min, lat_max)
     pyplot.subplots_adjust(wspace=0.3, hspace=0.3, right=0.95, top=0.95)
-    pyplot.savefig(output_filename_base+'_clusters.png', dpi=600)
+    pyplot.savefig(output_filename_base+'_clusters.pdf', dpi=600)
     pyplot.close()
 
     
@@ -543,6 +619,9 @@ def main(argv=None):
         for i in range(len(args)):
             if i > 2:
                 args[i] = float(args[i])
+        output = args[0]+'_craters.csv'
+        if os.path.exists(output) and (not clobber):
+            raise Usage("Output file already exists: %s\nUse -f to overwrite."%output)
         mz_cluster(*args)
     except Usage, err:
         print >>sys.stderr, err.msg

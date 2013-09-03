@@ -5,9 +5,13 @@
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables
-sudo apt-get -y install mysql-server
+sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev
+sudo apt-get -y install mysql-server 
 sudo pip install pymysql
+
+# add swap
+sudo mkswap /dev/xvde
+sudo swapon /dev/xvde
 
 # If need ISIS:
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
@@ -121,7 +125,12 @@ mkdir fits
 cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
 
 mkdir markings
-cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {}
+cat create_classification_stats.sql | mysql -uroot moonzoo
+cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
 
 mkdir clusters
-cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{}.csv markings/{}.csv
+cat equal_user_weights.sql | mysql -uroot moonzoo
+cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{}_uw clusters/{}.csv markings/{}.csv &> mz_cluster_uw.py.out
+
+cat create_user_weights.sql | mysql -uroot moonzoo
+cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{}_w clusters/{}.csv markings/{}.csv &> mz_cluster_w.py.out
