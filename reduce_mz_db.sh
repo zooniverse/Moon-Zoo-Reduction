@@ -130,3 +130,12 @@ cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv 
 
 mkdir clusters
 bash "test_clustering_uw.sh; test_clustering_w.sh;"
+
+# full clustering!
+cat create_user_weights.sql | mysql -uroot moonzoo
+( cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
+    1.0 2 10 3 4.0 0.4 0.5 30.655 30.800 20.125 20.255 &> mz_cluster.py.out ) &
+
+# offset catalogues to match reference
+refnac=`head -1 selected_nacs`
+cat selected_nacs | xargs -I{} python find_cat_offset.py clusters/${refnac}_craters.csv clusters/{}_craters.csv &> find_cat_offset.py.out

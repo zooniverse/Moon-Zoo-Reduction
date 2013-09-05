@@ -81,7 +81,7 @@ def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, nac_name=""):
     sample, line, xdiam, ydiam, angle, boulderyness, zoom, user = (data.field(n) for n in data.dtype.names)
     # Use multiprocessing to speed things up
     p = Pool(16)
-    result = map(getlatlonginfo, ((cub_file, line[i], sample[i]) for i in range(len(line))))
+    result = p.map(getlatlonginfo, ((cub_file, line[i], sample[i]) for i in range(len(line))))
     lat, long, pixelscale_l, pixelscale_s, phi = numpy.array(result).T
 
     xradius = xdiam / 2.0

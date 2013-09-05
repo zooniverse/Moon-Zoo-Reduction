@@ -37,7 +37,8 @@ matplotlib.rcParams.update({'font.size': 14})
 # minimum size is still hardcoded - needs to adapt to NAC pixel scale,
 # and preferably use knowledge of zoom level of each marking
 
-degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
+lunar_radius = 1737.4*1000  # metres
+degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 
 minsize_factor = 0.5  # downweight minsize markings by this factor
 
@@ -119,7 +120,6 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     # Get user weights
     print('\nGetting user weights')
     user_weights = get_user_weights(points['user'])
-    embed()
     user_weights_select = user_weights > min_user_weight
     user_weights_rejected = select.sum() - user_weights_select[select].sum()
     print('Removing %i of %i markings by users with very low weights'%(user_weights_rejected, select.sum()))
@@ -135,7 +135,6 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     print('\nNumber of markings: %i'%points.shape[0])
     if expert_markings_csv is not None:
         print('Number of expert markings: %i'%truth.shape[0])
-    embed()
     # Perform clustering of markings
     p = numpy.array([points[name] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
     clusters = iterative_fastclusterdata(p, threshold, maxcount, mincount, maxiter)
@@ -289,10 +288,11 @@ def crater_metric(uin, vin):
 
 def crater_absolute_position_metric(uin, vin):
     # get coords
-    x1, y1, s1 = uin[:3]
-    x2, y2, s2 = vin[:3]
+    long1, lat1, s1 = uin[:3]
+    long2, lat2, s2 = vin[:3]
     # calculate crater position difference
-    dr = numpy.sqrt((x2-x1)**2 + (y2-y1)**2) / degrees_per_metre
+    long1, long2, lat1, lat2 = [i*pi/180.0 for i in (long1, long2, lat1, lat2)]
+    dr = lunar_radius * numpy.arccos(numpy.cos(lat1)*numpy.cos(lat2)*numpy.cos(long1-long2) + numpy.sin(lat1)*numpy.sin(lat2))
     return dr
 
 
@@ -371,27 +371,20 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.15):
     #numpy.savetxt("testcraters.csv", p.transpose(), delimiter=",")
 
 
-def find_offset(p1, p2):
-    minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
-    minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
-    X1 = numpy.asarray([p1[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
-    X2 = numpy.asarray([p2[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
-    results = fmin(comparedata, [0.0, 0.0], args=(X1, X2))
-    return results[0]
-
-
 def compare(p1, p2):
     minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
     minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
     X1 = numpy.asarray([p1[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
     X2 = numpy.asarray([p2[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
-    return comparedata([0.0, 0.0], X1, X2)
+    return comparedata(numpy.array([0.0, 0.0]), X1, X2)
 
 
 def comparedata(shift, X1, X2, metric=crater_metric):
-    dX = numpy.zeros((X1.shape[0],1), numpy.double)
-    dX[:2,0] = shift
-    Y = scipy.cluster.hierarchy.distance.cdist(X1.T, (X2+dX).T, metric=metric)
+    dX = numpy.zeros((X2.shape[0],1), numpy.double)
+    # shift input in rough metres as seems to increase speed
+    dX[:2,0] = shift * degrees_per_metre
+    X2 = X2+dX
+    Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=metric)
     M = Y.min(numpy.argmax(Y.shape)).mean()
     return M
 
