@@ -24,6 +24,8 @@ import matplotlib
 matplotlib.use('PDF')
 import matplotlib.pyplot as pyplot
 from matplotlib.patches import Ellipse
+from scipy.optimize import fmin_powell as fmin
+from scipy.stats import scoreatpercentile
 import scipy.cluster
 #import fastcluster
 from collections import Container
@@ -199,17 +201,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     crater_mean = crater_mean[['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
     crater_stdev = crater_stdev[['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
     print('Found %i final clusters'%len(crater_count))
+
     # Write final crater catalogue to a csv file
-    fout = open(output_filename_base+'_craters.csv', 'w')
-    fout.write('long,long_std,lat,lat_std,radius,radius_std,axialratio,axialratio_std,angle,angle_std,boulderyness,boulderyness_std,score,count,countnotmin\n')
-    outarray = numpy.zeros((15, crater_mean.shape[0]), numpy.float)
-    outarray[:-3:2] = [crater_mean[n] for n in crater_mean.dtype.names]
-    outarray[1:-3:2] = [crater_stdev[n] for n in crater_stdev.dtype.names]
-    outarray[-3] = crater_score
-    outarray[-2] = crater_count
-    outarray[-1] = crater_countnotmin
-    numpy.savetxt(fout, outarray.T, delimiter=", ", fmt='%.6f')
-    fout.close()
+    write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     if truth is not None:
         matchval = compare(crater_mean, truth)
         print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
@@ -219,6 +213,23 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
                  user_weights, crater_score)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
+
+    if truth is not None:
+        # And now computing and applying offsets...
+        print('\nDetermining position offset between clustered craters and truth')
+        offset = find_offset(truth, crater_mean)
+        crater_mean = apply_offset(crater_mean, offset)
+        points = apply_offset(points, offset)
+        output_filename_base += '_offset'
+        # Write final offset crater catalogue to a csv file
+        write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
+        if truth is not None:
+            matchval = compare(crater_mean, truth)
+            print("\nMean metric distance between nearest neighbours after offset: %.3f"%matchval)
+        # Make some plots
+        plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
+                     user_weights, crater_score)
+    
     # If this is a test we know the true clustering, which can be used to evaluate performance
     if test:
         from sklearn import metrics
@@ -235,6 +246,19 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     return crater_count
     
 
+def write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin):
+    fout = open(output_filename_base+'_craters.csv', 'w')
+    fout.write('long,long_std,lat,lat_std,radius,radius_std,axialratio,axialratio_std,angle,angle_std,boulderyness,boulderyness_std,score,count,countnotmin\n')
+    outarray = numpy.zeros((15, crater_mean.shape[0]), numpy.float)
+    outarray[:-3:2] = [crater_mean[n] for n in crater_mean.dtype.names]
+    outarray[1:-3:2] = [crater_stdev[n] for n in crater_stdev.dtype.names]
+    outarray[-3] = crater_score
+    outarray[-2] = crater_count
+    outarray[-1] = crater_countnotmin
+    numpy.savetxt(fout, outarray.T, delimiter=", ", fmt='%.6f')
+    fout.close()
+
+    
 def get_user_weights(userids, db='moonzoo'):
     import pymysql
     if (userids == 0).all():
@@ -375,7 +399,29 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.15):
     f.close()        
     #numpy.savetxt("testcraters.csv", p.transpose(), delimiter=",")
 
+    
+def find_offset(p1, p2):
+    big = scoreatpercentile(p1['radius'], 75)
+    big = min(big, scoreatpercentile(p2['radius'], 75))
+    p1s = p1[p1['radius'] > big]
+    p2s = p2[p2['radius'] > big]
+    minsize1 = numpy.zeros(p1s.shape[0], [('minsize', numpy.double)])
+    minsize2 = numpy.zeros(p2s.shape[0], [('minsize', numpy.double)])
+    X1 = numpy.asarray([p1s[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
+    X2 = numpy.asarray([p2s[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
+    results = fmin(comparedata, [0.0, 0.0], args=(X1, X2), xtol=0.001, maxiter=1000)
+    results *= degrees_per_metre  # convert from rough metres to degrees
+    print('Found a shift of dlong = %e deg, dlat = %e deg'%tuple(results))
+    return results
 
+
+def apply_offset(p, offset):
+    pnew = p.copy()
+    pnew['long'] += offset[0]
+    pnew['lat'] += offset[1]
+    return pnew
+
+    
 def compare(p1, p2):
     minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
     minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
