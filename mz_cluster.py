@@ -26,6 +26,7 @@ import matplotlib.pyplot as pyplot
 from matplotlib.patches import Ellipse
 import scipy.cluster
 #import fastcluster
+from collections import Container
 
 # Some debugging tools:
 from IPython import embed
@@ -43,7 +44,7 @@ degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 minsize_factor = 0.5  # downweight minsize markings by this factor
 
 def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', expert_markings_csv='none',
-               threshold=1.0, mincount=2, maxcount=10, maxiter=3,
+               threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
     #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
@@ -80,7 +81,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     print
     print('*** Start of mz_cluster ***\n')
     print('output_filename_base = %s\nmoonzoo_markings_csv = %s\nexpert_markings_csv = %s'%(output_filename_base, moonzoo_markings_csv, expert_markings_csv))
-    print('threshold = %f\nmincount = %i\nmaxcount = %i\nmaxiter = %i'%(threshold, mincount, maxcount, maxiter))
+    print('threshold = %f\nmincount = %f\nmaxcount = %i\nmaxiter = %i'%(threshold, mincount, maxcount, maxiter))
     print('position_scale = %f\nsize_scale = %f\nmin_user_weight = %f'%(position_scale, size_scale, min_user_weight))
     print
     # set global variables for crater metric
@@ -292,7 +293,9 @@ def crater_absolute_position_metric(uin, vin):
     long2, lat2, s2 = vin[:3]
     # calculate crater position difference
     long1, long2, lat1, lat2 = [i*pi/180.0 for i in (long1, long2, lat1, lat2)]
-    dr = lunar_radius * numpy.arccos(numpy.cos(lat1)*numpy.cos(lat2)*numpy.cos(long1-long2) + numpy.sin(lat1)*numpy.sin(lat2))
+    x = numpy.cos(lat1)*numpy.cos(lat2)*numpy.cos(long1-long2) + numpy.sin(lat1)*numpy.sin(lat2)
+    x = numpy.minimum(numpy.maximum(x, -1.0), 1.0)
+    dr = lunar_radius * numpy.arccos(x)
     return dr
 
 
@@ -318,13 +321,15 @@ def crater_size_metric(uin, vin):
     return ds
 
 
-def draw_craters(points, c='r', lw=1, ls='solid'):
+def draw_craters(points, c='r', lw=1, ls='solid', alpha=0.5):
+    if not isinstance(lw, Container):
+        lw = numpy.zeros(len(points)) + lw
+    ax = pyplot.gcf().gca()
     for i, p in enumerate(points):
         x, y, r, q, theta, b = [p[name] for name in ['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
         crater = Ellipse((x, y), width=2*r*degrees_per_metre, height=2*q*r*degrees_per_metre, angle=theta,
-                         color=c, fill=False, lw=lw, ls=ls, alpha=0.5)
-        fig = pyplot.gcf()
-        fig.gca().add_artist(crater)
+                         color=c, fill=False, lw=lw[i], ls=ls, alpha=alpha)
+        ax.add_artist(crater)
     pyplot.xlabel('long')
     pyplot.ylabel('lat')
     
@@ -513,7 +518,7 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     
 def plot_crater_stats(crater_mean, truth, output_filename_base):
     pyplot.figure(figsize=(6., 8.))
-    pyplot.plot([0.5, 2.7], [3.5, 0.5], ':k')
+    pyplot.plot([0.8, 3.0], [10**3.5, 0.5], ':k')
     sf_bins_clust, sf_clust = plot_sizefreq(2*crater_mean['radius'], label='clustered')
     if truth is not None:
         print
@@ -532,7 +537,7 @@ def plot_crater_stats(crater_mean, truth, output_filename_base):
         text = 'mad_delta = %.3f'%numpy.median(numpy.abs(delta))
         print text
         pyplot.text(1.0, 10**0.4, text)
-    pyplot.axis(xmin=0.5, xmax=2.7, ymin=0.5, ymax=3.5)
+    pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.5, ymax=10**3.5)
     pyplot.xlabel('log10(diameter [m])')
     pyplot.ylabel('cumulative frequency')
     pyplot.legend(loc='lower left')
@@ -568,13 +573,17 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
     pyplot.savefig(output_filename_base+'_craters.pdf', dpi=300)
-    # pyplot.clf()
-    # if (user_weights is not None) or (crater_score is not None):
-    #     if user_weights is not None:
-    #         draw_craters(points, c='r', lw=user_weights)
-    #     if crater_score is not None:
-    #         draw_craters(crater_mean, c='b', lw=crater_score, alpha=0.5)
-    #     pyplot.savefig(output_filename_base+'_crater_weights.pdf', dpi=300)
+    pyplot.close()
+    pyplot.figure()
+    ax = pyplot.subplot(111)
+    ax.set_xlim(long_min, long_max)
+    ax.set_ylim(lat_min, lat_max)
+    if (user_weights is not None) or (crater_score is not None):
+        if user_weights is not None:
+            draw_craters(points, c='r', lw=user_weights)
+        if crater_score is not None:
+            draw_craters(crater_mean, c='b', lw=crater_score/3.0, alpha=0.25)
+        pyplot.savefig(output_filename_base+'_crater_weights.pdf', dpi=300)
 
     
 def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base):

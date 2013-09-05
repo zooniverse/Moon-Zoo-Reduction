@@ -129,7 +129,7 @@ cat create_classification_stats.sql | mysql -uroot moonzoo
 cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
 
 mkdir clusters
-bash "test_clustering_uw.sh; test_clustering_w.sh;"
+. ./test_clustering_uw.sh; wait; . ./test_clustering_w.sh
 
 # full clustering!
 cat create_user_weights.sql | mysql -uroot moonzoo

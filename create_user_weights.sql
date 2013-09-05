@@ -6,6 +6,7 @@ GROUP BY zooniverse_user_id;
 
 DROP TABLE IF EXISTS user_weights;
 CREATE TABLE user_weights
-SELECT *, ((0.5 + sqrt(count / 100.0)) * (1.0 - count_minsize / count)) as weight
+-- SELECT *, ((1.0 + 0.25*arcsinh(count / 100.0)) * (1.0 - count_minsize / count)) as weight
+SELECT *, ((1.0 + 0.25*LOG((count / 100.0) + SQRT(POW(count / 100.0, 2)+1))) * SQRT(1.0 - count_minsize / count)) as weight
 FROM user_stats;
 
