@@ -204,15 +204,15 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
 
     # Write final crater catalogue to a csv file
     write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
-    if truth is not None:
-        matchval = compare(crater_mean, truth)
-        print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
     plot_crater_stats(crater_mean, truth, output_filename_base)
+    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
     plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
                  user_weights, crater_score)
-    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
+    if truth is not None:
+        matchval = compare(crater_mean, truth)
+        print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
 
     if truth is not None:
         # And now computing and applying offsets...
@@ -223,12 +223,12 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
         output_filename_base += '_offset'
         # Write final offset crater catalogue to a csv file
         write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
-        if truth is not None:
-            matchval = compare(crater_mean, truth)
-            print("\nMean metric distance between nearest neighbours after offset: %.3f"%matchval)
         # Make some plots
         plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
                      user_weights, crater_score)
+        if truth is not None:
+            matchval = compare(crater_mean, truth)
+            print("\nMean metric distance between nearest neighbours after offset: %.3f"%matchval)
     
     # If this is a test we know the true clustering, which can be used to evaluate performance
     if test:
