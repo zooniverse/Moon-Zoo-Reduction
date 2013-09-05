@@ -5,7 +5,7 @@
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev
+sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev ipython
 sudo apt-get -y install mysql-server 
 sudo pip install pymysql
 
@@ -129,4 +129,4 @@ cat create_classification_stats.sql | mysql -uroot moonzoo
 cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
 
 mkdir clusters
-./test_clustering.sh
+bash "test_clustering_uw.sh; test_clustering_w.sh;"

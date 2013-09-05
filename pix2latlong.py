@@ -33,11 +33,18 @@
 """
 
 import os, sys, getopt
-from math import sin, cos, sqrt, pi
+from math import sin, cos, sqrt, pi, atan
 from string import strip
 import numpy
 import tempfile
 from multiprocessing import Pool
+
+# Some debugging tools:
+#from IPython import embed
+
+degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
+
+max_markings_per_slice = 25
 
 # This could be made substantially faster by creating some c++ code based on
 # campt.cpp to read a list of line,sample and output a list of long,lat.
@@ -51,7 +58,7 @@ def read_db(nac_name, db='moonzoo'):
                     angle, boulderyness, zoom, zooniverse_user_id
              FROM craters as C, classification_stats as S
              WHERE C.classification_id = S.classification_id
-             AND S.count < 25"""
+             AND S.count < %i"""%max_markings_per_slice
     if nac_name is not None:
         sql += "\nAND nac_name='%s';"%nac_name
     cur.execute(sql)
@@ -73,57 +80,76 @@ def pix2latlong(crater_csv=None, output_csv=None, cub_file=None, nac_name=""):
         data = numpy.recfromtxt(crater_csv, delimiter=',')
     sample, line, xdiam, ydiam, angle, boulderyness, zoom, user = (data.field(n) for n in data.dtype.names)
     # Use multiprocessing to speed things up
-    p = Pool(8)
-    result = p.map(run_campt, ((cub_file, line[i], sample[i]) for i in range(len(line))))
-    lat, long, latpixscale, longpixscale = numpy.array(result).T
-    # The following won't work if the lat and long pixel scales are different,
-    # and it is not clear exactly what the "diameters" refer to.
-    # Actually need to use angle, and know whether xdiam, ydiam are major are minor axis lengths,
-    # or projected sizes in long and lat.
+    p = Pool(16)
+    result = map(getlatlonginfo, ((cub_file, line[i], sample[i]) for i in range(len(line))))
+    lat, long, pixelscale_l, pixelscale_s, phi = numpy.array(result).T
+
     xradius = xdiam / 2.0
-    xradius_long = numpy.abs(xradius * numpy.cos(angle*pi/180.0) * longpixscale)
-    xradius_lat = numpy.abs(xradius * numpy.sin(angle*pi/180.0) * latpixscale)
-    xradius_metres = numpy.sqrt(xradius_long**2 + xradius_lat**2)
     yradius = ydiam / 2.0
-    yradius_long = numpy.abs(yradius * numpy.sin(angle*pi/180.0) * longpixscale)
-    yradius_lat = numpy.abs(yradius * numpy.cos(angle*pi/180.0) * latpixscale)
-    yradius_metres = numpy.sqrt(yradius_long**2 + yradius_lat**2)
+    
+    # Assuming angle is that between xdiam and positive line axis measured CCW
+    theta = angle * pi / 180.0  # radians
+    xradius_metres = xradius * numpy.sqrt((numpy.cos(theta) * pixelscale_s)**2 + (numpy.sin(theta) * pixelscale_l)**2)    
+    yradius_metres = yradius * numpy.sqrt((numpy.sin(theta) * pixelscale_s)**2 + (numpy.cos(theta) * pixelscale_l)**2)
+
     # Flag minimum size craters
     minsize = ((numpy.abs(xdiam - 20.0) + numpy.abs(ydiam - 20.0)) < 1.0e-5).astype(numpy.byte)
+
+    # Ensure axial ratio is between 0 and 1
     possize = (xradius_metres > 0) | (yradius_metres > 0)
     axialratio = numpy.ones(xradius.shape, numpy.float)
     axialratio[possize] = yradius_metres[possize]/xradius_metres[possize]
     flip = axialratio > 1.0001
     axialratio[flip] = 1.0/axialratio[flip]
+
+    # Determine angle
     angle[flip] = angle[flip] + 90.0
+    angle -= phi  # or should it be plus?
+    angle %= 180.0
+    
     outarray = numpy.rec.fromarrays((long, lat, xradius_metres, axialratio, angle, boulderyness, minsize, user))
     numpy.savetxt(out, outarray, delimiter=", ", fmt=('%.6f','%.6f','%.3f','%.3f','%.3f','%i','%i','%i'))
     out.close()
 
+
+def getlatlonginfo((cub_file, line, sample)):
+    # campt does not appear to give useful pixelscale info for images taken at an oblique angle
+    # to work around this, I run another campt offset by 1 pixel in line and sample,
+    # and use the offset in long and lat to get the relevant pixel scales
+    lat, long = run_campt(cub_file, line, sample)
+    lat_l, long_l = run_campt(cub_file, line+1, sample)
+    lat_s, long_s = run_campt(cub_file, line, sample+1)
+    dlat_l = (lat_l - lat) / degrees_per_metre
+    dlong_l = (long_l - long) * cos(lat*pi/180.) / degrees_per_metre
+    dlat_s = (lat_s - lat) / degrees_per_metre
+    dlong_s = (long_s - long) * cos(lat*pi/180.) / degrees_per_metre
+    if abs(dlong_s) > 1e-5:
+        phi = atan(dlat_s / dlong_s)
+    else:
+        phi = pi/2.0
+    pixelscale_s = sqrt(dlong_s**2 + dlat_s**2)
+    pixelscale_l = sqrt(dlong_l**2 + dlat_l**2)
+    phi = (phi*180/pi)%180
+    return lat, long, pixelscale_l, pixelscale_s, phi
+
     
-def run_campt((cub_file, line, sample)):
+def run_campt(cub_file, line, sample):
     # Construct command line
     tmp = tempfile.NamedTemporaryFile(delete=False)
     tmpname = tmp.name
     tmp.close()
     cmd = 'campt from=%s to=%s format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, tmpname, line, sample)
-    print cmd
     status = os.system(cmd) # returns the exit status, check it
     if status > 0:
         raise ISISError("Execution of campt failed.")
     # Run command and output to a temp file
     tmp = file(tmpname)
-    #l = tmp.readline()
-    #print l
-    #ls = l.split(',')
-    #print ls
-    #print [ls[x] for x in [7,9,16,17]]
     l = tmp.readline()
     tmp.close()
     os.remove(tmpname)
     ls = l.split(',')
-    lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]
-    return lat, long, latpixscale, longpixscale
+    lat, long, latpixscale, longpixscale = [float(ls[x]) for x in [7,9,16,17]]    
+    return lat, long
 
 
 class Usage(Exception):
