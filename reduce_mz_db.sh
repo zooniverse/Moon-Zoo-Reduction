@@ -5,7 +5,7 @@
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev ipython
+sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev ipython cython
 sudo apt-get -y install mysql-server 
 sudo pip install pymysql
 
