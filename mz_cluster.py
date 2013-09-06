@@ -29,6 +29,7 @@ from scipy.stats import scoreatpercentile
 import scipy.cluster
 #import fastcluster
 from collections import Container
+from matchids import matchids
 
 # Some debugging tools:
 from IPython import embed
@@ -279,34 +280,7 @@ def get_user_weights(userids, db='moonzoo'):
         db.close()
         match = matchids(data['f0'], userids.astype(numpy.int))
         return data['f1'][match].astype(numpy.float)
-
-
-def matchids(id1,id2):
-    """ Match two sets of ids. 
-        Returns: 
-          ibest -- array of indices of i1 that match i2; -1 if no match
-    """
-    indices = numpy.argsort(id1)
-    idsorted = id1[indices]
-    ibest = []
-    for i in range(len(id2)):
-        j = matchidsorted(idsorted,id2[i])
-        if j < 0:
-            ibest += [j]
-        else:
-            ibest += [indices[j]]
-    return numpy.array(ibest)
-
-
-def matchidsorted(ids,targetid):
-    """ Find id matches, return index in i1 that matches targetid; -1 if no match. """
-    i1 = numpy.searchsorted(ids,targetid)
-    if targetid == ids[i1]:
-        ibest = i1
-    else:
-        ibest = -1 
-    return ibest
-
+    
 
 def draw_craters(points, c='r', lw=1, ls='solid', alpha=0.5):
     if not isinstance(lw, Container):
