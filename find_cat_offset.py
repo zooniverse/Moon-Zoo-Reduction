@@ -10,7 +10,8 @@ def find_cat_offset(cat1, cat2, outcat=None, position_scale=4.0, size_scale=0.4)
     mz_cluster.sscale = size_scale
     p1 = numpy.genfromtxt(cat1, delimiter=',', names=True)
     p2 = numpy.genfromtxt(cat2, delimiter=',', names=True)
-    p2new = mz_cluster.find_offset(p1, p2)
+    offset = mz_cluster.find_offset(p1, p2)
+    p2new = apply_offset(crater_mean, offset)
     # Write offset crater catalogue to a csv file
     if outcat is None:
         dot = cat2.rfind('.')
