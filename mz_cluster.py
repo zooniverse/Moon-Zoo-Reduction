@@ -35,12 +35,16 @@ from IPython import embed
 #from IPython.core import ultratb
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
+# Cython auto compilation
+import pyximport; pyximport.install()
+import crater_metrics
+from crater_metrics import crater_absolute_position_metric, crater_position_metric, crater_size_metric, crater_metric, lunar_radius
+
 matplotlib.rcParams.update({'font.size': 14})
 
 # minimum size is still hardcoded - needs to adapt to NAC pixel scale,
 # and preferably use knowledge of zoom level of each marking
 
-lunar_radius = 1737.4*1000  # metres
 degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 
 minsize_factor = 0.5  # downweight minsize markings by this factor
@@ -86,10 +90,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     print('threshold = %f\nmincount = %f\nmaxcount = %i\nmaxiter = %i'%(threshold, mincount, maxcount, maxiter))
     print('position_scale = %f\nsize_scale = %f\nmin_user_weight = %f'%(position_scale, size_scale, min_user_weight))
     print
-    # set global variables for crater metric
-    global pscale, sscale
-    pscale = position_scale
-    sscale = size_scale
+    # set variables for crater metric
+    crater_metrics.pscale = position_scale
+    crater_metrics.sscale = size_scale
     # read in all data
     test=False
     if moonzoo_markings_csv.lower() == 'none':
@@ -140,6 +143,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
         print('Number of expert markings: %i'%truth.shape[0])
     # Perform clustering of markings
     p = numpy.array([points[name] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
+    p[0:2] *= pi/180.0
     clusters = iterative_fastclusterdata(p, threshold, maxcount, mincount, maxiter)
     # Previous clustering methods:
     ### clusters = fastclusterdata(p, t=threshold, criterion='distance', method='single', metric=crater_metric)
@@ -185,9 +189,11 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
         if crater_count[i] >= mincount:
             crater_mean['minsize'][i] = 0
             m = numpy.array([crater_mean[name][i] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
-            dra.extend(crater_absolute_position_metric(v, m))
-            drs.extend(crater_position_metric(v, m))
-            ds.extend(crater_size_metric(v, m))
+            v[0:2] *= pi/180.0
+            m[0:2] *= pi/180.0
+            dra.extend([crater_absolute_position_metric(vi, m) for vi in v.T])
+            drs.extend([crater_position_metric(vi, m) for vi in v.T])
+            ds.extend([crater_size_metric(vi, m) for vi in v.T])
             s.extend([crater_mean['radius'][i]]*crater_count[i])
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
@@ -300,49 +306,6 @@ def matchidsorted(ids,targetid):
     else:
         ibest = -1 
     return ibest
-
-
-def crater_metric(uin, vin):
-    # get position and size differences
-    dr = crater_position_metric(uin, vin) / pscale
-    ds = crater_size_metric(uin, vin) / sscale
-    # combine position and size differences
-    dist = sqrt(dr**2 + ds**2)
-    return dist
-
-
-def crater_absolute_position_metric(uin, vin):
-    # get coords
-    long1, lat1, s1 = uin[:3]
-    long2, lat2, s2 = vin[:3]
-    # calculate crater position difference
-    long1, long2, lat1, lat2 = [i*pi/180.0 for i in (long1, long2, lat1, lat2)]
-    x = numpy.cos(lat1)*numpy.cos(lat2)*numpy.cos(long1-long2) + numpy.sin(lat1)*numpy.sin(lat2)
-    x = numpy.minimum(numpy.maximum(x, -1.0), 1.0)
-    dr = lunar_radius * numpy.arccos(x)
-    return dr
-
-
-def crater_position_metric(uin, vin):
-    # get coords
-    x1, y1, s1 = uin[:3]
-    x2, y2, s2 = vin[:3]
-    # calculate mean crater size
-    sm = (s1 + s2)/2.0
-    # calculate crater position difference
-    dr = crater_absolute_position_metric(uin, vin) / numpy.sqrt(sm)
-    return dr
-
-
-def crater_size_metric(uin, vin):
-    # get coords
-    x1, y1, s1, m1 = uin[:4]
-    x2, y2, s2, m2 = vin[:4]
-    # calculate crater size difference
-    sm = (s1 + s2)/2.0
-    neither_minsize = (1-m1) * (1-m2)
-    ds = neither_minsize * numpy.abs(s1 - s2) / sm
-    return ds
 
 
 def draw_craters(points, c='r', lw=1, ls='solid', alpha=0.5):
