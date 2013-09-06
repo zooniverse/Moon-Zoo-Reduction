@@ -324,10 +324,11 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.15):
                 flag[i*ncraters+j] = 1
     # convert x,y in metres into long,lat
     x, y, cx, cy = numpy.multiply((x, y, cx, cy), degrees_per_metre)
+    offset = 0.001
     f = file('truthcraters.csv', 'w')
     f.write('long,lat,radius,axialratio,angle,boulderyness\n')
     for i in range(len(cx)):
-        f.write('%f,%f,%f,%f,%f,%i\n'%(cx[i], cy[i], cr[i], 1.0, 0.0, 0))
+        f.write('%f,%f,%f,%f,%f,%i\n'%(cx[i]+offset, cy[i]+offset, cr[i], 1.0, 0.0, 0))
     f.close()        
     f = file('testcraters.csv', 'w')
     f.write('long,lat,radius,axialratio,angle,boulderyness,minsize,user,truelabel\n')
@@ -338,14 +339,27 @@ def make_test_craters(ncraters=10, nobs=10, pmin=0.1, pwrong=0.15):
 
     
 def find_offset(p1, p2):
-    big = scoreatpercentile(p1['radius'], 75)
-    big = min(big, scoreatpercentile(p2['radius'], 75))
-    p1s = p1[p1['radius'] > big]
-    p2s = p2[p2['radius'] > big]
-    minsize1 = numpy.zeros(p1s.shape[0], [('minsize', numpy.double)])
-    minsize2 = numpy.zeros(p2s.shape[0], [('minsize', numpy.double)])
-    X1 = numpy.asarray([p1s[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
-    X2 = numpy.asarray([p2s[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
+    datarange = (p1['long'].min(), p1['long'].min(), p1['long'].max(), p1['lat'].min(), p1['lat'].max())    
+    long_min = max(p1['long'].min(), p2['long'].min())
+    long_max = min(p1['long'].max(), p2['long'].max())
+    lat_min = max(p1['lat'].min(), p2['lat'].min())
+    lat_max = min(p1['lat'].max(), p2['lat'].max())
+    select = (p1['long'] >= long_min) & (p1['long'] <= long_max) & (p1['lat'] >= lat_min) & (p1['lat'] <= lat_max)
+    p1 = p1[select]
+    select = (p2['long'] >= long_min) & (p2['long'] <= long_max) & (p2['lat'] >= lat_min) & (p2['lat'] <= lat_max)
+    p2 = p2[select]
+    if len(p1) < 1 or len(p2) < 1:
+        print('To few craters to find offset')
+        return [0.0, 0.0]
+    if len(p1) > 100 and len(p2) > 100:
+        big = scoreatpercentile(p1['radius'], 75)
+        big = min(big, scoreatpercentile(p2['radius'], 75))
+        p1 = p1[p1['radius'] > big]
+        p2 = p2[p2['radius'] > big]
+    minsize1 = numpy.zeros(p1.shape[0], [('minsize', numpy.double)])
+    minsize2 = numpy.zeros(p2.shape[0], [('minsize', numpy.double)])
+    X1 = numpy.asarray([p1[name] for name in ('long', 'lat', 'radius')]+[minsize1['minsize']], order='c', dtype=numpy.double)
+    X2 = numpy.asarray([p2[name] for name in ('long', 'lat', 'radius')]+[minsize2['minsize']], order='c', dtype=numpy.double)
     results = fmin(comparedata, [0.0, 0.0], args=(X1, X2), xtol=0.001, maxiter=1000)
     results *= degrees_per_metre  # convert from rough metres to degrees
     print('Found a shift of dlong = %e deg, dlat = %e deg'%tuple(results))
