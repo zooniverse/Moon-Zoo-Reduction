@@ -13,6 +13,11 @@ sudo pip install pymysql
 sudo mkswap /dev/xvde
 sudo swapon /dev/xvde
 
+# data on /mnt from a previous run may be available on an EBS:
+EC2VOLUME=vol-fa58ab8d
+ec2-attach-volume $EC2VOLUME -i $EC2INSTANCE -d /dev/xvdh
+sudo mount /dev/xvdh /mnt/ebs
+
 # If need ISIS:
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
 cd /mnt
@@ -135,7 +140,3 @@ mkdir clusters
 cat create_user_weights.sql | mysql -uroot moonzoo
 ( cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
     1.0 2 10 3 4.0 0.4 0.5 30.655 30.800 20.125 20.255 &> mz_cluster.py.out ) &
-
-# offset catalogues to match reference
-refnac=`head -1 selected_nacs`
-cat selected_nacs | xargs -I{} python find_cat_offset.py clusters/${refnac}_craters.csv clusters/{}_craters.csv &> find_cat_offset.py.out
