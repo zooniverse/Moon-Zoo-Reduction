@@ -21,7 +21,7 @@ sudo chmod -R go-rwx ~steven/.ssh
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install apparmor-utils cython ddd devscripts emacs emacs23-nox expect-dev gcc git-all imagemagick ipython libhdf4-alt-dev libhdf5-openmpi-dev libmagick++-dev libmpich2-dev libnetcdf-dev libplplot-dev libwxgtk2.8-dev mysql-client python python-cheetah python-dev python-imaging python-matplotlib python-numpy python-pip python-pyfits python-scipy python-tables r-recommended s3cmd screen sqlite sqlite3 subversion valgrind xemacs21
+sudo apt-get -y install apparmor-utils cython ddd devscripts emacs23 expect-dev gcc git-all imagemagick ipython libhdf4-alt-dev libhdf5-openmpi-dev libmagick++-dev libmpich2-dev libnetcdf-dev libplplot-dev libwxgtk2.8-dev mysql-client python python-cheetah python-dev python-imaging python-matplotlib python-numpy python-pip python-pyfits python-scipy python-sklearn python-tables r-recommended s3cmd screen sqlite sqlite3 subversion valgrind xemacs21
 
 sudo apt-get -y install mysql-server 
 sudo pip install pymysql
@@ -100,6 +100,9 @@ sudo restart mysql
 sudo mkdir /mnt/moonzoo
 sudo chown -R ubuntu:ubuntu /mnt/moonzoo
 cd /mnt/moonzoo
+
+# get scripts
+git clone git@bitbucket.org:bamford/moon-zoo-scripts.git scripts
 
 wget http://zooniverse-code.s3.amazonaws.com/databases/010913/moonzoo_production_010913.sql.gz
 wget http://moonzoo.s3.amazonaws.com/v10/database/MZP.db
