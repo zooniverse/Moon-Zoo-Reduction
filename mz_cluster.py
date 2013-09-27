@@ -199,8 +199,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
     # select final craters exceeding specified score
-    # also reject craters with only one
-    ok = crater_score >= mincount and crater_countnotmin != 1
+    # also reject craters with only one notmin marking
+    ok = (crater_score >= mincount) & (crater_countnotmin != 1)
     crater_score = crater_score[ok]
     crater_count = crater_count[ok]
     crater_countnotmin = crater_countnotmin[ok]
