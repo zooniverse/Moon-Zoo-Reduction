@@ -99,7 +99,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     if moonzoo_markings_csv.lower() == 'none':
         # If no filename specified, generate and use test data
         test = True
-        make_test_craters(ncraters=50, nobs=10)
+        make_test_craters(ncraters=100, nobs=10)
         expert_markings_csv = 'truthcraters.csv'
         moonzoo_markings_csv = 'testcraters.csv'
     truth = None
@@ -211,13 +211,16 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     print('Found %i final clusters'%len(crater_count))
 
     # Write final crater catalogue to a csv file
-    write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
+#    write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
-    plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-    plot_crater_stats(crater_mean, truth, output_filename_base)
-    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
-    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-                 user_weights, crater_score)
+#    plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
+#    plot_crater_stats(crater_mean, truth, output_filename_base)
+#    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
+#    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
+#                 user_weights, crater_score)
+
+    test = truth = None
+
     if truth is not None:
         matchval = compare(crater_mean, truth)
         print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
@@ -624,7 +627,7 @@ def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat
     
 def timetest():
     import timeit
-    print('Time: %f s'%min(timeit.repeat(stmt='mz_cluster.mz_cluster()', setup='import mz_cluster', repeat=3, number=1)))
+    print('Time: %f s'%min(timeit.repeat(stmt='mz_cluster.mz_cluster()', setup='import mz_cluster', repeat=1, number=1)))
 
     
 class Usage(Exception):
@@ -651,10 +654,13 @@ def main(argv=None):
         for i in range(len(args)):
             if i > 2:
                 args[i] = float(args[i])
-        output = args[0]+'_craters.csv'
-        if os.path.exists(output) and (not clobber):
-            raise Usage("Output file already exists: %s\nUse -f to overwrite."%output)
-        mz_cluster(*args)
+        if len(args) > 0:
+            output = args[0]+'_craters.csv'
+            if os.path.exists(output) and (not clobber):
+                raise Usage("Output file already exists: %s\nUse -f to overwrite."%output)
+            mz_cluster(*args)
+        else:
+            timetest()
     except Usage, err:
         print >>sys.stderr, err.msg
         print >>sys.stderr, "For help use --help"
