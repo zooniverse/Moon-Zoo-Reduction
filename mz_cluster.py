@@ -39,7 +39,7 @@ from IPython import embed
 # Cython auto compilation
 import pyximport; pyximport.install()
 import crater_metrics
-from crater_metrics import crater_absolute_position_metric, crater_position_metric, crater_size_metric, crater_metric, lunar_radius
+from crater_metrics import crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric, crater_metric, lunar_radius
 
 matplotlib.rcParams.update({'font.size': 14})
 
@@ -401,7 +401,8 @@ def fastclusterdata(X, t, criterion='distance', metric=crater_metric, method='si
         raise TypeError('The observation matrix X must be an n by m numpy '
                         'array.')
 
-    Y = scipy.cluster.hierarchy.distance.pdist(X, metric=metric)
+    #Y = scipy.cluster.hierarchy.distance.pdist(X, metric=metric)
+    Y = crater_pdist(X)
     #Z = fastcluster.linkage(Y, method=method)
     Z = scipy.cluster.hierarchy.linkage(Y, method=method)
     T = scipy.cluster.hierarchy.fcluster(Z, criterion=criterion, t=t)

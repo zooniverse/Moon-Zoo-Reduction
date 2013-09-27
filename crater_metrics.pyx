@@ -1,12 +1,35 @@
 from libc.math cimport cos, sin, asin, sqrt
 
+import numpy
+cimport numpy
+
 pscale = 1.0
 sscale = 1.0
 lunar_radius = 1737.4*1000  # metres
 
 # these expect lat and long in radians!
 
-def crater_metric(uin, vin):
+DTYPE = numpy.double
+ctypedef numpy.double_t DTYPE_t
+
+def crater_pdist(numpy.ndarray[DTYPE_t, ndim=2] X):
+    assert X.dtype == DTYPE
+    cdef numpy.ndarray[DTYPE_t, ndim=1] dm
+    cdef int m, n, i, j, k
+
+    m = X.shape[0]
+    n = X.shape[1]
+    dm = numpy.zeros((m * (m - 1)) // 2, dtype=DTYPE)
+
+    k = 0
+    for i in xrange(0, m - 1):
+        for j in xrange(i + 1, m):
+            dm[k] = crater_metric(X[i], X[j])
+            k = k + 1
+    return dm
+
+
+cpdef crater_metric(object uin, object vin):
     cdef double dr, ds, dist
     # get position and size differences
     dr = crater_position_metric(uin, vin) / pscale
