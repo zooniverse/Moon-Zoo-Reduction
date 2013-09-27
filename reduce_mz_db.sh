@@ -2,21 +2,67 @@
 
 # Once ssh'ed into the AWS machine...
 
+# Create users
+sudo useradd steven -m -s /bin/bash -G users
+
+# Permissions in preparation for using /data as shared space
+sudo sed -i.orig "s/umask 022/umask 007/" /etc/profile
+
+# Enable login as steven
+sudo mkdir ~steven/.ssh
+sudo mv steven_id_rsa.pub ~steven/.ssh/authorized_keys
+sudo chown -R steven.steven ~steven/.ssh
+sudo chmod -R go-rwx ~steven/.ssh
+
+# To perform administration as steven (requires manual intervention)
+#sudo visudo  # add "steven  ALL=(ALL) NOPASSWD:ALL" to /etc/sudoers
+# now login as steven
+
 # install packages
 sudo apt-get -y update
 sudo apt-get -y upgrade
-sudo apt-get -y install python git sqlite python-imaging python-numpy python-scipy python-cheetah emacs23-nox sqlite3 python-pyfits mysql-client s3cmd apparmor-utils python-pip python-tables python-matplotlib expect-dev ipython cython
+sudo apt-get -y install apparmor-utils cython ddd devscripts emacs emacs23-nox expect-dev gcc git-all imagemagick ipython libhdf4-alt-dev libhdf5-openmpi-dev libmagick++-dev libmpich2-dev libnetcdf-dev libplplot-dev libwxgtk2.8-dev mysql-client python python-cheetah python-dev python-imaging python-matplotlib python-numpy python-pip python-pyfits python-scipy python-tables r-recommended s3cmd screen sqlite sqlite3 subversion valgrind xemacs21
+
 sudo apt-get -y install mysql-server 
 sudo pip install pymysql
+
+# NX
+sudo add-apt-repository ppa:freenx-team
+sudo aptitude update
+sudo aptitude install -y make openssh-server python python-pexpect \
+    python-simplejson python-gtk2 python-gobject gcc autoconf automake \
+    python-docutils netcat xauth x11-xserver-utils nxagent-dev
+sudo aptitude install -y kubuntu-desktop
+sudo ln -s /usr/bin/startkde /usr/bin/startkde4
+
+# NeatX
+svn checkout http://neatx.googlecode.com/svn/trunk/ neatx
+cd neatx/neatx
+sudo sed -i.orig "s/pkglib_/pkglibexec_/" Makefile.am
+./autogen.sh
+./configure --prefix=/usr/local/neatx
+make
+sudo make install
+sudo ln -s /usr/local/neatx/libexec/neatx /usr/local/neatx/lib/
+cd ~
+sudo useradd --system -m -d /usr/local/neatx/var/lib/neatx/home -s /usr/local/neatx/lib/neatx/nxserver-login-wrapper nx
+sudo install -D -m 600 -o nx /usr/local/neatx/share/neatx/authorized_keys.nomachine ~nx/.ssh/authorized_keys
+sudo cp /usr/local/neatx/share/doc/neatx/neatx.conf.example /usr/local/etc/neatx.conf
+rm -rf neatx
+
+# Setup git
+git config --global user.name "Steven"
+git config --global user.email steven@stevenbamford.com
 
 # add swap
 sudo mkswap /dev/xvde
 sudo swapon /dev/xvde
 
 # data on /mnt from a previous run may be available on an EBS:
-EC2VOLUME=vol-fa58ab8d
-ec2-attach-volume $EC2VOLUME -i $EC2INSTANCE -d /dev/xvdh
-sudo mount /dev/xvdh /mnt/ebs
+$ EC2VOLUME=vol-fa58ab8d
+$ ec2-attach-volume $EC2VOLUME -i $EC2INSTANCE -d /dev/xvdh
+sudo mkdir /mnt
+sudo mount /dev/xvdh /mnt
 
 # If need ISIS:
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
