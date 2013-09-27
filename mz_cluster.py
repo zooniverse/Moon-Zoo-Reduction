@@ -192,9 +192,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
             m = numpy.array([crater_mean[name][i] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
             v[0:2] *= pi/180.0
             m[0:2] *= pi/180.0
-            dra.extend([crater_absolute_position_metric(vi, m) for vi in v.T])
-            drs.extend([crater_position_metric(vi, m) for vi in v.T])
-            ds.extend([crater_size_metric(vi, m) for vi in v.T])
+            dra.extend(crater_absolute_position_metric(m, v))
+            drs.extend(crater_position_metric(m, v))
+            ds.extend(crater_size_metric(m, v))
             s.extend([crater_mean['radius'][i]]*crater_count[i])
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
@@ -390,7 +390,8 @@ def comparedata(shift, X1, X2, metric=crater_metric):
     # shift input in rough metres as seems to increase speed
     dX[:2,0] = shift * degrees_per_metre
     X2 = X2+dX
-    Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=metric)
+    #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=metric)
+    Y = crater_cdist(X1.T, X2.T)
     M = Y.min(numpy.argmax(Y.shape)).mean()
     return M
 

@@ -59,7 +59,7 @@ def crater_numpy_metric(uin, vin):
     hdLat = (lat2 - lat1)/2.0
     hdLong = (long2 - long1)/2.0
     x = numpy.sin(hdLat)**2 + numpy.sin(hdLong)**2 * numpy.cos(lat1) * numpy.cos(lat2)
-    dr = lunar_diameter * numpy.arcsin(numpy.sqrt(x))
+    dr = lunar_diameter * numpy.arcsin(numpy.sqrt(x)) / sqrt(sm)
     # combine position and size differences
     dist = numpy.sqrt(dr**2 + ds**2)
     return dist
