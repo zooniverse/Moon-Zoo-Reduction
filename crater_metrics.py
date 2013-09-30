@@ -25,7 +25,7 @@ def crater_pdist(X):
 def crater_cdist(X1, X2):
     m = X1.shape[0]
     n = X2.shape[0]
-    dm = zeros((m * n, dtype=X.dtype)
+    dm = zeros(m * n, dtype=X.dtype)
     k = 0
     for i in xrange(0, m):
         x = crater_metric(X1[i], X2)
