@@ -29,7 +29,6 @@ from scipy.stats import scoreatpercentile
 import scipy.cluster
 #import fastcluster
 from collections import Container
-from matchids import matchids
 
 # Some debugging tools:
 from IPython import embed
@@ -38,6 +37,7 @@ from IPython import embed
 
 # Cython auto compilation
 import pyximport; pyximport.install()
+from matchids import matchids
 import crater_metrics
 from crater_metrics import crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric, crater_metric, lunar_radius
 
