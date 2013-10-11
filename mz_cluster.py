@@ -25,7 +25,7 @@ matplotlib.use('PDF')
 import matplotlib.pyplot as pyplot
 from matplotlib.patches import Ellipse
 from scipy.optimize import fmin_powell as fmin
-from scipy.stats import scoreatpercentile
+from scipy.stats import scoreatpercentile, ks_2samp
 import scipy.cluster
 import fastcluster
 from collections import Container
@@ -517,12 +517,44 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
 
     
 def plot_crater_stats(crater_mean, truth, output_filename_base):
+    plot_crater_sizefreq(crater_mean, truth, output_filename_base)
+    plot_crater_cumsizefreq(crater_mean, truth, output_filename_base)
+
+
+def plot_crater_sizefreq(crater_mean, truth, output_filename_base):
     pyplot.figure(figsize=(6., 8.))
-    pyplot.plot([0.8, 3.0], [10**3.5, 0.5], ':k')
     sf_bins_clust, sf_clust = plot_sizefreq(2*crater_mean['radius'], label='clustered')
     if truth is not None:
         print
         sf_bins_truth, sf_truth = plot_sizefreq(2*truth['radius'], sf_bins_clust, label='truth')
+        ok = (sf_clust > 0) & (sf_truth > 0)
+        D, p = ks_2samp(crater_mean['radius'], truth['radius'])
+        text = 'KS D, p = %.3f, %.3f'%(D, p)
+        print text
+        pyplot.text(1.5, 100.0, text)
+    pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.0)
+    pyplot.xlabel('log10(diameter [m])')
+    pyplot.ylabel('frequency')
+    pyplot.legend(loc='lower left')
+    pyplot.savefig(output_filename_base+'_sizefreq.pdf', dpi=300)
+    pyplot.close()
+
+
+def plot_sizefreq(size, bins=10, label=''):
+    h, b = numpy.histogram(numpy.log10(size), bins, range=(0.8, 3.0))
+    c = 0.5*(b[:-1]+b[1:])
+    err = numpy.sqrt(h)
+    ax = pyplot.errorbar(c, h, yerr=err, ls='steps-mid', label=label)
+    return b, h
+
+
+def plot_crater_cumsizefreq(crater_mean, truth, output_filename_base):
+    pyplot.figure(figsize=(6., 8.))
+    pyplot.plot([0.8, 3.0], [10**3.5, 0.5], ':k')
+    sf_bins_clust, sf_clust = plot_cumsizefreq(2*crater_mean['radius'], label='clustered')
+    if truth is not None:
+        print
+        sf_bins_truth, sf_truth = plot_cumsizefreq(2*truth['radius'], sf_bins_clust, label='truth')
         ok = (sf_clust > 0) & (sf_truth > 0)
         delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
         text = 'mean_delta = %.3f'%delta.mean()
@@ -541,11 +573,11 @@ def plot_crater_stats(crater_mean, truth, output_filename_base):
     pyplot.xlabel('log10(diameter [m])')
     pyplot.ylabel('cumulative frequency')
     pyplot.legend(loc='lower left')
-    pyplot.savefig(output_filename_base+'_sizefreq.pdf', dpi=300)
+    pyplot.savefig(output_filename_base+'_cumsizefreq.pdf', dpi=300)
     pyplot.close()
 
 
-def plot_sizefreq(size, bins=10000, label=''):
+def plot_cumsizefreq(size, bins=10000, label=''):
     h, b = numpy.histogram(numpy.log10(size), bins)
     c = numpy.cumsum(h[::-1])
     c = c[::-1]
