@@ -39,7 +39,7 @@ from collections import Container
 import pyximport; pyximport.install()
 from matchids import matchids
 import crater_metrics
-from crater_metrics import crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric,lunar_radius, crater_metric_one as crater_metric
+from crater_metrics import crater_cdist, crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric,lunar_radius, crater_metric_one as crater_metric
 
 matplotlib.rcParams.update({'font.size': 14})
 
@@ -99,7 +99,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     if moonzoo_markings_csv.lower() == 'none':
         # If no filename specified, generate and use test data
         test = True
-        #make_test_craters(ncraters=250, nobs=10)
+        make_test_craters(ncraters=100, nobs=10)
         expert_markings_csv = 'truthcraters.csv'
         moonzoo_markings_csv = 'testcraters.csv'
     truth = None
@@ -211,15 +211,12 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     print('Found %i final clusters'%len(crater_count))
 
     # Write final crater catalogue to a csv file
-#    write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
+    write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
-#    plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-#    plot_crater_stats(crater_mean, truth, output_filename_base)
-#    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
-#    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-#                 user_weights, crater_score)
-
-    test = truth = None
+    plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
+    plot_crater_stats(crater_mean, truth, output_filename_base)
+    plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
+    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score)
 
     if truth is not None:
         matchval = compare(crater_mean, truth)
