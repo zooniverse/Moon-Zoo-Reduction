@@ -1,4 +1,3 @@
-from libc.math cimport cos, sin, asin, sqrt
 import numpy
 cimport numpy
 from numpy import *
@@ -7,7 +6,6 @@ import numexpr
 pscale = 1.0
 sscale = 1.0
 lunar_radius = 1737.4*1000  # metres
-lunar_diameter = 2 * lunar_radius
 cdef float lunar_diameter = 2 * lunar_radius
 
 # these expect lat and long in radians!
@@ -15,31 +13,38 @@ cdef float lunar_diameter = 2 * lunar_radius
 DTYPE = numpy.double
 ctypedef numpy.double_t DTYPE_t
 
-def test(n=1000):
-    from scipy.scipy.cluster.hierarchy.distance import pdist, cdist
-    from timeit import repeat
-    x = random.normal(0, 1, (n, 4))
-    y = random.normal(0, 1, (n, 4))
+def test(n=100):
+    from scipy.spatial.distance import pdist, cdist
+    from timethis import timethis
+    x = random.normal(10, 1, (n, 4))
+    y = random.normal(10, 1, (n, 4))
+    x[:,3] = x[:,3] > 11.0
+    y[:,3] = y[:,3] > 11.0
     d1 = crater_pdist(x)
-    d2 = pdist(x, crater_metric)
+    d2 = pdist(x, crater_metric_one)
     if (d1 == d2).all():
         print 'pdist match'
-    t1 = timeit('crater_pdist(x)', 'from __main__ import f', repeat=10, number=1)
-    t2 = timeit('pdist(x, crater_metric)', 'from __main__ import f', repeat=10, number=1)
-    f = min(t1)/min(t2)
-    print 'New pdist runs in a factor of %.2f of the time of the original'%f
-    d1 = crater_cdist(x)
-    d2 = cdist(x, y, crater_metric)
+    else:
+        print 'pdist do not match'
+        return x, y, d1, d2
+    t1 = timethis('crater_pdist(x)', globals(), locals())
+    t2 = timethis('pdist(x, crater_metric_one)', globals(), locals())
+    f = t1/t2
+    print 'New pdist runs in a factor of %.3f of the time of the original'%f
+    d1 = crater_cdist(x, y)
+    d2 = cdist(x, y, crater_metric_one)
     if (d1 == d2).all():
         print 'cdist match'
-    t1 = timeit('crater_cdist(x, y)', 'from __main__ import f', repeat=10, number=1)
-    t2 = timeit('cdist(x, y, crater_metric)', 'from __main__ import f', repeat=10, number=1)
-    f = min(t1)/min(t2)
-    print 'New cdist runs in a factor of %.2f of the time of the original'%f
+    else:
+        print 'cdist do not match'
+        return x, y, d1, d2
+    t1 = timethis('crater_cdist(x, y)', globals(), locals())
+    t2 = timethis('cdist(x, y, crater_metric_one)', globals(), locals())
+    f = t1/t2
+    print 'New cdist runs in a factor of %.3f of the time of the original'%f
     
 def crater_pdist(numpy.ndarray[DTYPE_t, ndim=2] X):
-    assert X.dtype == DTYPE
-    cdef numpy.ndarray[DTYPE_t, ndim=1] dm
+    cdef numpy.ndarray[DTYPE_t, ndim=1] x, dm
     cdef int m, i, k
     m = X.shape[0]
     dm = zeros((m * (m - 1)) // 2, dtype=DTYPE)
@@ -47,30 +52,30 @@ def crater_pdist(numpy.ndarray[DTYPE_t, ndim=2] X):
     for i in xrange(0, m-1):
         x = crater_metric(X[i], X[i+1:m])
         dm[k:k+m-i-1] = x
-        k += 1
+        k += m-i-1
     return dm
 
 def crater_cdist(numpy.ndarray[DTYPE_t, ndim=2] X1, numpy.ndarray[DTYPE_t, ndim=2] X2):
-    assert X1.dtype == DTYPE
-    assert X2.dtype == DTYPE
-    cdef numpy.ndarray[DTYPE_t, ndim=1] dm
+    cdef numpy.ndarray[DTYPE_t, ndim=1] x
+    cdef numpy.ndarray[DTYPE_t, ndim=2] dm
     cdef int m, n, i, k
     m = X1.shape[0]
     n = X2.shape[0]
-    dm = zeros(m * n, dtype=X.dtype)
-    k = 0
+    dm = zeros((m, n), dtype=X1.dtype)
     for i in xrange(0, m):
         x = crater_metric(X1[i], X2)
-        dm[k:k+n] = x
-        k += 1
+        dm[i] = x
     return dm
 
-cpdef crater_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
-    assert uin.dtype == DTYPE
-    assert vin.dtype == DTYPE
-    cdef DTYPE long1, lat1, s1, m1
+cpdef numpy.ndarray[DTYPE_t, ndim=1] crater_metric_one(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=1] vin):
+    cdef numpy.ndarray[DTYPE_t, ndim=2] vin2
+    vin2 = numpy.array([vin])
+    return crater_metric(uin, vin2)
+
+cpdef numpy.ndarray[DTYPE_t, ndim=1] crater_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
+    cdef double long1, lat1, s1, m1
     cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2, s2, m2
-    cdef numpy.ndarray[DTYPE_t, ndim=1] sm, neither_minsize, ds, hdLat, hdlong, x, dr, dist
+    cdef numpy.ndarray[DTYPE_t, ndim=1] sm, neither_minsize, ds, hdLat, hdLong, x, dr, dist
     # get coords
     long1, lat1, s1, m1 = uin[:4]
     long2, lat2, s2, m2 = vin[:,:4].T
@@ -101,14 +106,12 @@ def crater_numexpr_metric(uin, vin):
     return dist
 
 def crater_absolute_position_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
-    assert uin.dtype == DTYPE
-    assert vin.dtype == DTYPE
-    cdef DTYPE long1, lat1, s1, m1
-    cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2, s2, m2
-    cdef numpy.ndarray[DTYPE_t, ndim=1] hdLat, hdlong, x, dr, dist
+    cdef double long1, lat1
+    cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2
+    cdef numpy.ndarray[DTYPE_t, ndim=1] hdLat, hdLong, x, dr
     # get coords
-    long1, lat1, s1, m1 = uin[:4]
-    long2, lat2, s2, m2 = vin[:,:4].T
+    long1, lat1 = uin[:2]
+    long2, lat2 = vin[:,:2].T
     # calculate crater position difference
     hdLat = (lat2 - lat1)/2.0
     hdLong = (long2 - long1)/2.0
@@ -117,14 +120,12 @@ def crater_absolute_position_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.nd
     return dr
 
 def crater_position_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
-    assert uin.dtype == DTYPE
-    assert vin.dtype == DTYPE
-    cdef DTYPE long1, lat1, s1, m1
-    cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2, s2, m2
-    cdef numpy.ndarray[DTYPE_t, ndim=1] sm, hdLat, hdlong, x, dr, dist
+    cdef double long1, lat1, s1
+    cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2, s2
+    cdef numpy.ndarray[DTYPE_t, ndim=1] sm, hdLat, hdLong, x, dr
     # get coords
-    long1, lat1, s1, m1 = uin[:4]
-    long2, lat2, s2, m2 = vin[:,:4].T
+    long1, lat1, s1 = uin[:3]
+    long2, lat2, s2 = vin[:,:3].T
     # calculate crater size difference
     sm = (s1 + s2)/2.0
     # calculate crater position difference
@@ -135,9 +136,7 @@ def crater_position_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTY
     return dr
 
 def crater_size_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
-    assert uin.dtype == DTYPE
-    assert vin.dtype == DTYPE
-    cdef DTYPE long1, lat1, s1, m1
+    cdef double long1, lat1, s1, m1
     cdef numpy.ndarray[DTYPE_t, ndim=1] long2, lat2, s2, m2
     cdef numpy.ndarray[DTYPE_t, ndim=1] sm, neither_minsize, ds
     # get coords
