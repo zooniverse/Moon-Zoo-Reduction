@@ -27,11 +27,11 @@ from matplotlib.patches import Ellipse
 from scipy.optimize import fmin_powell as fmin
 from scipy.stats import scoreatpercentile
 import scipy.cluster
-#import fastcluster
+import fastcluster
 from collections import Container
 
 # Some debugging tools:
-from IPython import embed
+#from IPython import embed
 #from IPython.core import ultratb
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
@@ -39,7 +39,7 @@ from IPython import embed
 import pyximport; pyximport.install()
 from matchids import matchids
 import crater_metrics
-from crater_metrics import crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric, crater_metric, lunar_radius
+from crater_metrics import crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric,lunar_radius, crater_metric_one as crater_metric
 
 matplotlib.rcParams.update({'font.size': 14})
 
@@ -99,7 +99,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     if moonzoo_markings_csv.lower() == 'none':
         # If no filename specified, generate and use test data
         test = True
-        make_test_craters(ncraters=100, nobs=10)
+        #make_test_craters(ncraters=250, nobs=10)
         expert_markings_csv = 'truthcraters.csv'
         moonzoo_markings_csv = 'testcraters.csv'
     truth = None
@@ -147,8 +147,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     p[0:2] *= pi/180.0
     clusters = iterative_fastclusterdata(p, threshold, maxcount, mincount, maxiter)
     # Previous clustering methods:
-    ### clusters = fastclusterdata(p, t=threshold, criterion='distance', method='single', metric=crater_metric)
-    ### clusters = dbscanclusterdata(p, t=threshold, m=mincount, metric=crater_metric)
+    ### clusters = fastclusterdata(p, t=threshold, criterion='distance', method='single')
+    ### clusters = dbscanclusterdata(p, t=threshold, m=mincount)
     ### clusters = scipy.cluster.hierarchy.fclusterdata(p, t=threshold, criterion='distance', method='single', metric='euclidean')
     ### clusters = scipy.cluster.hierarchy.fclusterdata(p, t=threshold, criterion='inconsistent', method='single', metric='euclidean')
     # Calculate clustered crater properties and useful stats
@@ -192,9 +192,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
             m = numpy.array([crater_mean[name][i] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
             v[0:2] *= pi/180.0
             m[0:2] *= pi/180.0
-            dra.extend(crater_absolute_position_metric(m, v))
-            drs.extend(crater_position_metric(m, v))
-            ds.extend(crater_size_metric(m, v))
+            dra.extend(crater_absolute_position_metric(m, v.T))
+            drs.extend(crater_position_metric(m, v.T))
+            ds.extend(crater_size_metric(m, v.T))
             s.extend([crater_mean['radius'][i]]*crater_count[i])
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
@@ -385,18 +385,18 @@ def compare(p1, p2):
     return comparedata(numpy.array([0.0, 0.0]), X1, X2)
 
 
-def comparedata(shift, X1, X2, metric=crater_metric):
+def comparedata(shift, X1, X2):
     dX = numpy.zeros((X2.shape[0],1), numpy.double)
     # shift input in rough metres as seems to increase speed
     dX[:2,0] = shift * degrees_per_metre
     X2 = X2+dX
-    #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=metric)
+    #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=crater_metric)
     Y = crater_cdist(X1.T, X2.T)
     M = Y.min(numpy.argmax(Y.shape)).mean()
     return M
 
 
-def fastclusterdata(X, t, criterion='distance', metric=crater_metric, method='single'):
+def fastclusterdata(X, t, criterion='distance', method='single'):
     """
     scipy.cluster.hierarchy.fclusterdata modified to use fastcluster
     """
@@ -406,15 +406,15 @@ def fastclusterdata(X, t, criterion='distance', metric=crater_metric, method='si
         raise TypeError('The observation matrix X must be an n by m numpy '
                         'array.')
 
-    #Y = scipy.cluster.hierarchy.distance.pdist(X, metric=metric)
+    #Y = scipy.cluster.hierarchy.distance.pdist(X, metric=crater_metric)
     Y = crater_pdist(X)
-    #Z = fastcluster.linkage(Y, method=method)
-    Z = scipy.cluster.hierarchy.linkage(Y, method=method)
+    Z = fastcluster.linkage(Y, method=method)
+    #Z = scipy.cluster.hierarchy.linkage(Y, method=method)
     T = scipy.cluster.hierarchy.fcluster(Z, criterion=criterion, t=t)
     return T
 
 
-def dbscanclusterdata(X, t, m, metric=crater_metric):
+def dbscanclusterdata(X, t, m):
     """
     Attempt at using sklearn.DBSCAN - but no faster than fastcluster
     """
@@ -426,7 +426,7 @@ def dbscanclusterdata(X, t, m, metric=crater_metric):
         raise TypeError('The observation matrix X must be an n by m numpy '
                         'array.')
 
-    db = DBSCAN(eps=t, min_samples=m, metric=metric).fit(X)
+    db = DBSCAN(eps=t, min_samples=m, metric=crater_metric).fit(X)
     labels = numpy.array(db.labels_, dtype=numpy.int) + 1
     return labels
 
@@ -450,7 +450,7 @@ def iterative_fastclusterdata(points, threshold, maxcount, mincount, maxiter):
                     print('\nIteration %i, threshold %.3f'%(iteration, threshold))
                 print('%i clusters, cluster number %i with %i members.'%(nclusters, i, p.shape[1]))
                 subclusters = fastclusterdata(p.transpose(), t=threshold, criterion='distance',
-                                              method='single', metric=crater_metric)
+                                              method='single')
                 nsubclusters = subclusters.max()
                 newclusters += nsubclusters
                 clusters[clusters > i] -= 1
@@ -627,8 +627,9 @@ def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat
 
     
 def timetest():
-    import timeit
-    print('Time: %f s'%min(timeit.repeat(stmt='mz_cluster.mz_cluster()', setup='import mz_cluster', repeat=1, number=1)))
+    from timethis import timethis
+    t = timethis('mz_cluster()', globals(), repeat=3, number=1)
+    print('Time: %f s'%t)
 
     
 class Usage(Exception):
