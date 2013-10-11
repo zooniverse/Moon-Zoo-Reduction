@@ -220,7 +220,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
 
     if truth is not None:
         matchval = compare(crater_mean, truth)
-        print("\nMean metric distance between nearest neighbours: %.3f"%matchval)
+        print("\nMedian metric distance between nearest neighbours: %.3f"%matchval)
 
     if truth is not None:
         # And now computing and applying offsets...
@@ -236,7 +236,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
                      user_weights, crater_score)
         if truth is not None:
             matchval = compare(crater_mean, truth)
-            print("\nMean metric distance between nearest neighbours after offset: %.3f"%matchval)
+            print("\nMedian metric distance between nearest neighbours after offset: %.3f"%matchval)
     
     # If this is a test we know the true clustering, which can be used to evaluate performance
     if test:
@@ -389,7 +389,7 @@ def comparedata(shift, X1, X2):
     X2 = X2+dX
     #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=crater_metric)
     Y = crater_cdist(X1.T, X2.T)
-    M = Y.min(numpy.argmax(Y.shape)).mean()
+    M = numpy.median(Y.min(numpy.argmax(Y.shape)))
     return M
 
 
