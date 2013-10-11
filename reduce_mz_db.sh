@@ -25,6 +25,9 @@ sudo apt-get -y install apparmor-utils cython ddd devscripts emacs23 expect-dev 
 
 sudo apt-get -y install mysql-server 
 sudo pip install pymysql
+sudo pip install fastcluster
+# hacky fix:
+sudo chmod -R a+rX /usr/local/lib/python2.7/dist-packages
 
 # NX
 sudo add-apt-repository ppa:freenx-team
