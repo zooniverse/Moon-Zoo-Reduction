@@ -78,6 +78,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
                       normalised by the square root of the crater size
     size_scale -- maximum fractional size difference for linking two markings
     min_user_weight -- minimum user weight to be included at all
+                       if this is > 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
 
     This could incorporate user weighting in future, e.g. by assigning
@@ -125,12 +126,16 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     select = (points['long'] >= long_min) & (points['long'] <= long_max)
     select &= (points['lat'] >= lat_min) & (points['lat'] <= lat_max)
     # Get user weights
-    print('\nGetting user weights')
-    user_weights = get_user_weights(points['user'])
-    user_weights_select = user_weights > min_user_weight
-    user_weights_rejected = select.sum() - user_weights_select[select].sum()
-    print('Removing %i of %i markings by users with very low weights'%(user_weights_rejected, select.sum()))
-    select &= user_weights_select
+    if min_user_weight > 100:
+        print('\nIgnoring user weights')
+        user_weights = numpy.ones(len(userids), numpy.float)
+    else:
+        print('\nGetting user weights')
+        user_weights = get_user_weights(points['user'])
+        user_weights_select = user_weights > min_user_weight
+        user_weights_rejected = select.sum() - user_weights_select[select].sum()
+        print('Removing %i of %i markings by users with very low weights'%(user_weights_rejected, select.sum()))
+        select &= user_weights_select
     # Filter by user weight
     points = points[select]
     user_weights = user_weights[select]
