@@ -36,7 +36,7 @@ from collections import Container
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
 # Cython auto compilation
-import pyximport; pyximport.install()
+import pyximport; pyximport.install(setup_args={"include_dirs":numpy.get_include()})
 from matchids import matchids
 import crater_metrics
 from crater_metrics import crater_cdist, crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric,lunar_radius, crater_metric_one as crater_metric
