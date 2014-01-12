@@ -29,6 +29,7 @@ from scipy.stats import scoreatpercentile
 import scipy.cluster
 import fastcluster
 from collections import Container
+from numpy.lib.recfunctions import append_fields
 
 # Some debugging tools:
 #from IPython import embed
@@ -78,7 +79,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
                       normalised by the square root of the crater size
     size_scale -- maximum fractional size difference for linking two markings
     min_user_weight -- minimum user weight to be included at all
-                       if this is > 100, then user weights are ignored
+                       if this is >= 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
 
     This could incorporate user weighting in future, e.g. by assigning
@@ -106,19 +107,34 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     truth = None
     if expert_markings_csv.lower() != 'none':
         # If 'truth' data is supplied, use it in plots
-        # robstest
-        #data = numpy.genfromtxt(expert_markings_csv, delimiter=None, names=True)
-        #truth = numpy.array([data['x'], data['y'], data['RIM_DIA']])
-        #truth['radius'] /= 2.0  # fix diameter to radius
-        # internal test
         truth = numpy.genfromtxt(expert_markings_csv, delimiter=',', names=True)
+        if truth.dtype.names[:3] != ('long', 'lat', 'radius'):
+            # this is a cat from Rob, rather than an internal test cat
+            truth.dtype.names = ('long', 'lat', 'radius') + truth.dtype.names[3:]
+            truth['radius'] /= 2.0  # fix diameter to radius
+            n = len(truth)
+            truth = numpy.rec.fromarrays([truth['long'], truth['lat'], truth['radius'],
+                                          numpy.zeros(n, numpy.float), numpy.ones(n, numpy.float),
+                                          numpy.zeros(n, numpy.float)],
+                                          names=('long', 'lat', 'radius', 'axialratio', 'angle',
+                                                 'boulderyness'))
         datarange = (truth['long'].min(), truth['long'].max(), truth['lat'].min(), truth['lat'].max())
         print('Expert data covers region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
         if test:
             long_min, long_max, lat_min, lat_max = datarange
     # Get markings data
     points = numpy.recfromtxt(moonzoo_markings_csv, delimiter=',', names=True)
-    points = points.view(numpy.ndarray)
+    if points.dtype.names[:3] != ('long', 'lat', 'radius'):
+        # this is a cat from Rob, rather than one produced from the pipeline
+        points.dtype.names = ('long', 'lat', 'radius') + points.dtype.names[3:]
+        points['radius'] /= 2.0  # fix diameter to radius
+        n = len(points)
+        points = numpy.rec.fromarrays([points['long'], points['lat'], points['radius'],
+                                       numpy.zeros(n, numpy.float), numpy.ones(n, numpy.float),
+                                       numpy.zeros(n, numpy.float), numpy.zeros(n, numpy.bool),
+                                       numpy.zeros(n, numpy.int)],
+                                       names=('long', 'lat', 'radius', 'axialratio', 'angle',
+                                              'boulderyness', 'minsize', 'user'))
     datarange = (points['long'].min(), points['long'].max(), points['lat'].min(), points['lat'].max())
     print('Markings cover region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
     # Select region of interest
@@ -126,9 +142,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     select = (points['long'] >= long_min) & (points['long'] <= long_max)
     select &= (points['lat'] >= lat_min) & (points['lat'] <= lat_max)
     # Get user weights
-    if min_user_weight > 100:
+    if min_user_weight >= 100:
         print('\nIgnoring user weights')
-        user_weights = numpy.ones(len(userids), numpy.float)
+        user_weights = numpy.ones(len(points), numpy.float)
     else:
         print('\nGetting user weights')
         user_weights = get_user_weights(points['user'])
