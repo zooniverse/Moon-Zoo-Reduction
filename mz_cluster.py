@@ -114,7 +114,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
             truth['radius'] /= 2.0  # fix diameter to radius
             n = len(truth)
             truth = numpy.rec.fromarrays([truth['long'], truth['lat'], truth['radius'],
-                                          numpy.zeros(n, numpy.float), numpy.ones(n, numpy.float),
+                                          numpy.ones(n, numpy.float), numpy.zeros(n, numpy.float),
                                           numpy.zeros(n, numpy.float)],
                                           names=('long', 'lat', 'radius', 'axialratio', 'angle',
                                                  'boulderyness'))
@@ -127,10 +127,9 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     if points.dtype.names[:3] != ('long', 'lat', 'radius'):
         # this is a cat from Rob, rather than one produced from the pipeline
         points.dtype.names = ('long', 'lat', 'radius') + points.dtype.names[3:]
-        points['radius'] /= 2.0  # fix diameter to radius
         n = len(points)
         points = numpy.rec.fromarrays([points['long'], points['lat'], points['radius'],
-                                       numpy.zeros(n, numpy.float), numpy.ones(n, numpy.float),
+                                       numpy.ones(n, numpy.float), numpy.zeros(n, numpy.float),
                                        numpy.zeros(n, numpy.float), numpy.zeros(n, numpy.bool),
                                        numpy.zeros(n, numpy.int)],
                                        names=('long', 'lat', 'radius', 'axialratio', 'angle',
@@ -155,12 +154,14 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     # Filter by user weight
     points = points[select]
     user_weights = user_weights[select]
+    smallest_radius = points['radius'].min()
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
-        select &= truth['radius'] > points['radius'].min()  # remove small expert craters
+        select &= truth['radius'] > smallest_radius  # remove small expert craters
         truth = truth[select]
     print('\nNumber of markings: %i'%points.shape[0])
+    print('Radius of smallest marking: %.3f'%smallest_radius)
     if expert_markings_csv is not None:
         print('Number of expert markings: %i'%truth.shape[0])
     # Perform clustering of markings
@@ -371,7 +372,7 @@ def find_offset(p1, p2):
     select = (p2['long'] >= long_min) & (p2['long'] <= long_max) & (p2['lat'] >= lat_min) & (p2['lat'] <= lat_max)
     p2 = p2[select]
     if len(p1) < 1 or len(p2) < 1:
-        print('To few craters to find offset')
+        print('Too few craters to find offset')
         return [0.0, 0.0]
     if len(p1) > 100 and len(p2) > 100:
         big = scoreatpercentile(p1['radius'], 75)
