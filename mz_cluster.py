@@ -594,6 +594,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
+    ax.set_aspect('equal')
     pyplot.savefig(output_filename_base+'_craters.pdf', dpi=300)
     pyplot.close()
     pyplot.figure()
@@ -605,6 +606,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
             draw_craters(points, c='r', lw=user_weights)
         if crater_score is not None:
             draw_craters(crater_mean, c='b', lw=crater_score/3.0, alpha=0.25)
+        ax.set_aspect('equal')
         pyplot.savefig(output_filename_base+'_crater_weights.pdf', dpi=300)
 
     
