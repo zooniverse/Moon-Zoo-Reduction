@@ -2,7 +2,7 @@
 
 """pix2latlong.py - Convert NAC image pixel coords to lat, long
 
-    Version 2013-09-02
+    Version 2014-01-15
 
     Usage:
         pix2latlong.py <crater_csv> <output_csv> <cub_file>
@@ -11,7 +11,7 @@
         Using csv input:
             python pix2latlong.py craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub
         Using database input (database name 'moonzoo'), also need to specify nac_name:
-            python db:moonzoo craters.csv craters_latlong.csv CUB/M101963963LE.cal.cub, M101963963LE
+            python pix2latlong.py db:moonzoo craters_latlong.csv CUB/M101963963LE.cal.cub, M101963963LE
         
     This program uses the ISIS routine 'campt' to convert the input
     pixel coordinates and sizes into latitude, longitude and size in metres.
@@ -116,9 +116,9 @@ def getlatlonginfo((cub_file, line, sample)):
     # campt does not appear to give useful pixelscale info for images taken at an oblique angle
     # to work around this, I run another campt offset by 1 pixel in line and sample,
     # and use the offset in long and lat to get the relevant pixel scales
-    lat, long = run_campt(cub_file, line, sample)
-    lat_l, long_l = run_campt(cub_file, line+1, sample)
-    lat_s, long_s = run_campt(cub_file, line, sample+1)
+    lat, long = run_campt((cub_file, line, sample))
+    lat_l, long_l = run_campt((cub_file, line+1, sample))
+    lat_s, long_s = run_campt((cub_file, line, sample+1))
     dlat_l = (lat_l - lat) / degrees_per_metre
     dlong_l = (long_l - long) * cos(lat*pi/180.) / degrees_per_metre
     dlat_s = (lat_s - lat) / degrees_per_metre
@@ -133,7 +133,7 @@ def getlatlonginfo((cub_file, line, sample)):
     return lat, long, pixelscale_l, pixelscale_s, phi
 
     
-def run_campt(cub_file, line, sample):
+def run_campt((cub_file, line, sample)):
     # Construct command line
     tmp = tempfile.NamedTemporaryFile(delete=False)
     tmpname = tmp.name
