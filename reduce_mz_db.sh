@@ -71,7 +71,7 @@ sudo mount /dev/xvdh /mnt
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
 cd /mnt
 sudo mkdir isis3
-sudo chown -R ubuntu:ubuntu /mnt/isis3
+sudo chown -R steven:steven /mnt/isis3
 cd isis3
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::x86-64_linux_UBUNTU/isis .
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/base data/
@@ -91,7 +91,7 @@ sudo mkdir /mnt/log/mysql
 sudo mkdir /mnt/csv
 sudo chown -R mysql:mysql /mnt/log/mysql
 sudo chown -R mysql:mysql /mnt/lib/mysql
-sudo chown -R mysql:ubuntu /mnt/csv
+sudo chown -R mysql:steven /mnt/csv
 sudo aa-complain /usr/sbin/mysqld
 sudo mysql_install_db --ldata=/mnt/lib/mysql
 
@@ -101,7 +101,7 @@ sudo cp ~/ec2.cnf /etc/mysql/conf.d/
 sudo restart mysql
 
 sudo mkdir /mnt/moonzoo
-sudo chown -R ubuntu:ubuntu /mnt/moonzoo
+sudo chown -R steven:steven /mnt/moonzoo
 cd /mnt/moonzoo
 
 # get scripts
