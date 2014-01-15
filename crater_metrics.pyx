@@ -89,6 +89,8 @@ cpdef numpy.ndarray[DTYPE_t, ndim=1] crater_metric(numpy.ndarray[DTYPE_t, ndim=1
     x = sin(hdLat)**2 + sin(hdLong)**2 * cos(lat1) * cos(lat2)
     dr = lunar_diameter * arcsin(sqrt(x)) / sqrt(sm)
     # combine position and size differences
+    dr /= pscale
+    ds /= sscale
     dist = sqrt(dr**2 + ds**2)
     return dist
 
@@ -102,6 +104,8 @@ def crater_numexpr_metric(uin, vin):
     # calculate crater position difference
     dr = 'lunar_diameter*arcsin(sqrt(sin((lat2 - lat1)/2.0)**2 + sin((long2 - long1)/2.0)**2 * cos(lat1) * cos(lat2))) / sqrt((s1 + s2)/2.0)'
     # combine position and size differences
+    dr /= pscale
+    ds /= sscale
     dist = numexpr.evaluate('sqrt(('+dr+')**2 + ('+ds+')**2)')
     return dist
 

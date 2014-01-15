@@ -29,6 +29,7 @@ from scipy.stats import scoreatpercentile, ks_2samp
 import scipy.cluster
 import fastcluster
 from collections import Container
+from numpy.lib.recfunctions import append_fields
 
 # Some debugging tools:
 #from IPython import embed
@@ -36,7 +37,7 @@ from collections import Container
 #sys.excepthook = ultratb.FormattedTB(mode='Verbose', color_scheme='Linux', call_pdb=1)
 
 # Cython auto compilation
-import pyximport; pyximport.install()
+import pyximport; pyximport.install(setup_args={"include_dirs":numpy.get_include()})
 from matchids import matchids
 import crater_metrics
 from crater_metrics import crater_cdist, crater_pdist, crater_absolute_position_metric, crater_position_metric, crater_size_metric,lunar_radius, crater_metric_one as crater_metric
@@ -50,7 +51,8 @@ degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 
 minsize_factor = 0.5  # downweight minsize markings by this factor
 
-def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', expert_markings_csv='none',
+def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
+               expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
@@ -78,8 +80,10 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
                       normalised by the square root of the crater size
     size_scale -- maximum fractional size difference for linking two markings
     min_user_weight -- minimum user weight to be included at all
+                       if this is >= 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
-
+    img -- image to put underneath crater plots
+    
     This could incorporate user weighting in future, e.g. by assigning
     clusters scores based on the sum of the user weights for each
     clustered marking, and using a minscore rather than mincount.
@@ -105,19 +109,33 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     truth = None
     if expert_markings_csv.lower() != 'none':
         # If 'truth' data is supplied, use it in plots
-        # robstest
-        #data = numpy.genfromtxt(expert_markings_csv, delimiter=None, names=True)
-        #truth = numpy.array([data['x'], data['y'], data['RIM_DIA']])
-        #truth['radius'] /= 2.0  # fix diameter to radius
-        # internal test
         truth = numpy.genfromtxt(expert_markings_csv, delimiter=',', names=True)
+        if truth.dtype.names[:3] != ('long', 'lat', 'radius'):
+            # this is a cat from Rob, rather than an internal test cat
+            truth.dtype.names = ('long', 'lat', 'radius') + truth.dtype.names[3:]
+            truth['radius'] /= 2.0  # fix diameter to radius
+            n = len(truth)
+            truth = numpy.rec.fromarrays([truth['long'], truth['lat'], truth['radius'],
+                                          numpy.ones(n, numpy.float), numpy.zeros(n, numpy.float),
+                                          numpy.zeros(n, numpy.float)],
+                                          names=('long', 'lat', 'radius', 'axialratio', 'angle',
+                                                 'boulderyness'))
         datarange = (truth['long'].min(), truth['long'].max(), truth['lat'].min(), truth['lat'].max())
         print('Expert data covers region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
         if test:
             long_min, long_max, lat_min, lat_max = datarange
     # Get markings data
     points = numpy.recfromtxt(moonzoo_markings_csv, delimiter=',', names=True)
-    points = points.view(numpy.ndarray)
+    if points.dtype.names[:3] != ('long', 'lat', 'radius'):
+        # this is a cat from Rob, rather than one produced from the pipeline
+        points.dtype.names = ('long', 'lat', 'radius') + points.dtype.names[3:]
+        n = len(points)
+        points = numpy.rec.fromarrays([points['long'], points['lat'], points['radius'],
+                                       numpy.ones(n, numpy.float), numpy.zeros(n, numpy.float),
+                                       numpy.zeros(n, numpy.float), numpy.zeros(n, numpy.bool),
+                                       numpy.zeros(n, numpy.int)],
+                                       names=('long', 'lat', 'radius', 'axialratio', 'angle',
+                                              'boulderyness', 'minsize', 'user'))
     datarange = (points['long'].min(), points['long'].max(), points['lat'].min(), points['lat'].max())
     print('Markings cover region: long=(%.3f, %.3f), lat=(%.3f, %.3f)'%datarange)
     # Select region of interest
@@ -125,21 +143,27 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     select = (points['long'] >= long_min) & (points['long'] <= long_max)
     select &= (points['lat'] >= lat_min) & (points['lat'] <= lat_max)
     # Get user weights
-    print('\nGetting user weights')
-    user_weights = get_user_weights(points['user'])
-    user_weights_select = user_weights > min_user_weight
-    user_weights_rejected = select.sum() - user_weights_select[select].sum()
-    print('Removing %i of %i markings by users with very low weights'%(user_weights_rejected, select.sum()))
-    select &= user_weights_select
+    if min_user_weight >= 100:
+        print('\nIgnoring user weights')
+        user_weights = numpy.ones(len(points), numpy.float)
+    else:
+        print('\nGetting user weights')
+        user_weights = get_user_weights(points['user'])
+        user_weights_select = user_weights > min_user_weight
+        user_weights_rejected = select.sum() - user_weights_select[select].sum()
+        print('Removing %i of %i markings by users with very low weights'%(user_weights_rejected, select.sum()))
+        select &= user_weights_select
     # Filter by user weight
     points = points[select]
     user_weights = user_weights[select]
+    smallest_radius = points['radius'].min()
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
-        select &= truth['radius'] > points['radius'].min()  # remove small expert craters
+        select &= truth['radius'] > smallest_radius  # remove small expert craters
         truth = truth[select]
     print('\nNumber of markings: %i'%points.shape[0])
+    print('Radius of smallest marking: %.3f'%smallest_radius)
     if expert_markings_csv is not None:
         print('Number of expert markings: %i'%truth.shape[0])
     # Perform clustering of markings
@@ -214,9 +238,11 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-    plot_crater_stats(crater_mean, truth, output_filename_base)
+    plot_crater_stats(crater_mean, truth, output_filename_base, cum=True, log=True)
+    plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False)
+    #plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False, relative=True)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
-    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score)
+    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score, img=image)
 
     if truth is not None:
         matchval = compare(crater_mean, truth)
@@ -233,7 +259,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
         write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
         # Make some plots
         plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-                     user_weights, crater_score)
+                     user_weights, crater_score, img=image)
         if truth is not None:
             matchval = compare(crater_mean, truth)
             print("\nMedian metric distance between nearest neighbours after offset: %.3f"%matchval)
@@ -350,7 +376,7 @@ def find_offset(p1, p2):
     select = (p2['long'] >= long_min) & (p2['long'] <= long_max) & (p2['lat'] >= lat_min) & (p2['lat'] <= lat_max)
     p2 = p2[select]
     if len(p1) < 1 or len(p2) < 1:
-        print('To few craters to find offset')
+        print('Too few craters to find offset')
         return [0.0, 0.0]
     if len(p1) > 100 and len(p2) > 100:
         big = scoreatpercentile(p1['radius'], 75)
@@ -389,7 +415,10 @@ def comparedata(shift, X1, X2):
     X2 = X2+dX
     #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=crater_metric)
     Y = crater_cdist(X1.T, X2.T)
-    M = numpy.median(Y.min(numpy.argmax(Y.shape)))
+    # mean is probably best for determining offsets, as varies smoothly
+    M = numpy.mean(Y.min(numpy.argmax(Y.shape)))
+    # median is probably a better measure of overall quality of a clustering
+    #M = numpy.median(Y.min(numpy.argmax(Y.shape)))
     return M
 
 
@@ -599,11 +628,19 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     ax.set_xlim(long_min, long_max)
     ax.set_ylim(lat_min, lat_max)
     msel = points['minsize'].astype(numpy.bool)
+
+    if img is not None and img.lower() != 'none':
+        import Image
+        img = Image.open(img)
+        a = numpy.asarray(img)
+        ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
+
     draw_craters(points[msel], c='r', lw=0.25)
     draw_craters(points[numpy.logical_not(msel)], c='r', lw=0.5)
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
+    ax.set_aspect('equal')
     pyplot.savefig(output_filename_base+'_craters.pdf', dpi=300)
     pyplot.close()
     pyplot.figure()
@@ -615,6 +652,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
             draw_craters(points, c='r', lw=user_weights)
         if crater_score is not None:
             draw_craters(crater_mean, c='b', lw=crater_score/3.0, alpha=0.25)
+        ax.set_aspect('equal')
         pyplot.savefig(output_filename_base+'_crater_weights.pdf', dpi=300)
 
     
@@ -683,7 +721,7 @@ def main(argv=None):
             if o in ("-f", "--force"):
                 clobber = True
         for i in range(len(args)):
-            if i > 2:
+            if i > 3:
                 args[i] = float(args[i])
         if len(args) > 0:
             output = args[0]+'_craters.csv'
