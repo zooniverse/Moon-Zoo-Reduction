@@ -414,7 +414,10 @@ def comparedata(shift, X1, X2):
     X2 = X2+dX
     #Y = scipy.cluster.hierarchy.distance.cdist(X1.T, X2.T, metric=crater_metric)
     Y = crater_cdist(X1.T, X2.T)
-    M = numpy.median(Y.min(numpy.argmax(Y.shape)))
+    # mean is probably best for determining offsets, as varies smoothly
+    M = numpy.mean(Y.min(numpy.argmax(Y.shape)))
+    # median is probably a better measure of overall quality of a clustering
+    #M = numpy.median(Y.min(numpy.argmax(Y.shape)))
     return M
 
 
