@@ -56,15 +56,17 @@ def slice2latlong(db=None, cub_file=None, nac_name=""):
     print nac_name
     data = read_db(nac_name.upper(), db)
     id = data.field("asset_id")
+    n = len(id)
+    print n*4, "positions to compute"
     # Use multiprocessing to speed things up
     p = Pool(16)
-    result = p.map(run_campt, ((cub_file, data.field("x_min")[i], data.field("y_min")[i]) for i in range(len(data))))
+    result = p.map(run_campt, ((cub_file, data.field("x_min")[i], data.field("y_min")[i]) for i in range(n)))
     lat_1, long_1  = numpy.array(result).T
-    result = p.map(run_campt, ((cub_file, data.field("x_min")[i], data.field("y_max")[i]) for i in range(len(data))))
+    result = p.map(run_campt, ((cub_file, data.field("x_min")[i], data.field("y_max")[i]) for i in range(n)))
     lat_2, long_2  = numpy.array(result).T
-    result = p.map(run_campt, ((cub_file, data.field("x_max")[i], data.field("y_max")[i]) for i in range(len(data))))
+    result = p.map(run_campt, ((cub_file, data.field("x_max")[i], data.field("y_max")[i]) for i in range(n)))
     lat_3, long_3  = numpy.array(result).T
-    result = p.map(run_campt, ((cub_file, data.field("x_max")[i], data.field("y_min")[i]) for i in range(len(data))))
+    result = p.map(run_campt, ((cub_file, data.field("x_max")[i], data.field("y_min")[i]) for i in range(n)))
     lat_4, long_4  = numpy.array(result).T
     long_min = numpy.min((long_1, long_2, long_3, long_4), axis=0)
     long_max = numpy.max((long_1, long_2, long_3, long_4), axis=0)
