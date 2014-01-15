@@ -183,12 +183,13 @@ cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
 
 mkdir markings
 cat create_classification_stats.sql | mysql -uroot moonzoo
-cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
+cat selected_nacs | xargs -I{} python scripts/pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
+cat selected_nacs | xargs -I{} python scripts/slice2latlong.py moonzoo cub/{}.cub {} &> slice2latlong.py.out
 
 mkdir clusters
 . ./test_clustering_uw.sh; wait; . ./test_clustering_w.sh
 
 # full clustering!
 cat create_user_weights.sql | mysql -uroot moonzoo
-( cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
+( cat selected_nacs | xargs -I{} python scripts/mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
     1.0 2 10 3 4.0 0.4 0.5 30.655 30.800 20.125 20.255 &> mz_cluster.py.out ) &
