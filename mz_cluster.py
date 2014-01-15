@@ -51,7 +51,8 @@ degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 
 minsize_factor = 0.5  # downweight minsize markings by this factor
 
-def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', expert_markings_csv='none',
+def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
+               expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
