@@ -81,7 +81,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     min_user_weight -- minimum user weight to be included at all
                        if this is >= 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
-
+    img -- image to put underneath crater plots
+    
     This could incorporate user weighting in future, e.g. by assigning
     clusters scores based on the sum of the user weights for each
     clustered marking, and using a minscore rather than mincount.
@@ -236,9 +237,11 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
     write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-    plot_crater_stats(crater_mean, truth, output_filename_base)
+    plot_crater_stats(crater_mean, truth, output_filename_base, cum=True, log=True)
+    plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False)
+    #plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False, relative=True)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
-    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score)
+    plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score, img=image)
 
     if truth is not None:
         matchval = compare(crater_mean, truth)
@@ -255,7 +258,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none', 
         write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
         # Make some plots
         plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-                     user_weights, crater_score)
+                     user_weights, crater_score, img=image)
         if truth is not None:
             matchval = compare(crater_mean, truth)
             print("\nMedian metric distance between nearest neighbours after offset: %.3f"%matchval)
@@ -538,47 +541,109 @@ def plot_cluster_stats(dra, drs, ds, s, notminsize, output_filename_base):
     pyplot.close()
 
     
-def plot_crater_stats(crater_mean, truth, output_filename_base):
+def plot_crater_stats(crater_mean, truth, output_filename_base, cum=True, log=True,
+                      relative=False):
     pyplot.figure(figsize=(6., 8.))
-    pyplot.plot([0.8, 3.0], [10**3.5, 0.5], ':k')
-    sf_bins_clust, sf_clust = plot_sizefreq(2*crater_mean['radius'], label='clustered')
+    if cum and log:
+        pyplot.plot([0.8, 3.0], [10**3.5, 0.5], ':k')
+    sf_bins_clust, sf_clust = plot_sizefreq(2*crater_mean['radius'], label='clustered',
+                                            cum=cum, log=log)
+    pre = ''
+    if cum:
+        xpos = 1.0
+        ypos = iter(numpy.power(10, numpy.arange(1.0, 0.0, -0.2)))
+    else:
+        xpos = 2.0
+        ypos = iter(numpy.arange(80.0, 0.0, -5))
     if truth is not None:
         print
-        sf_bins_truth, sf_truth = plot_sizefreq(2*truth['radius'], sf_bins_clust, label='truth')
+        if relative:
+            pre += 'rel_'
+            pyplot.clf()
+            sf_bins_truth, sf_truth = plot_sizefreq(2*truth['radius'], sf_bins_clust, label='truth',
+                                                    cum=cum, log=log, relative=sf_clust)
+        else:
+            sf_bins_truth, sf_truth = plot_sizefreq(2*truth['radius'], sf_bins_clust, label='truth',
+                                                    cum=cum, log=log)
         ok = (sf_clust > 0) & (sf_truth > 0)
-        delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
+        if cum:
+            delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
+        else:
+            delta = sf_clust[ok].astype(numpy.float) - sf_truth[ok]
+        if log:
+            pre += 'log_'
+        if cum:
+            pre += 'cum_'
         text = 'mean_delta = %.3f'%delta.mean()
-        print text
-        pyplot.text(1.0, 10**1.0, text)
+        print pre+text
+        pyplot.text(xpos, ypos.next(), text)
         text = 'med_delta = %.3f'%numpy.median(delta)
-        print text
-        pyplot.text(1.0, 10**0.8, text)
+        print pre+text
+        pyplot.text(xpos, ypos.next(), text)
         text = 'rms_delta = %.3f'%numpy.sqrt((delta**2).mean())
-        print text    
-        pyplot.text(1.0, 10**0.6, text)
+        print pre+text    
+        pyplot.text(xpos, ypos.next(), text)
         text = 'mad_delta = %.3f'%numpy.median(numpy.abs(delta))
-        print text
-        pyplot.text(1.0, 10**0.4, text)
-    pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.5, ymax=10**3.5)
+        print pre+text
+        pyplot.text(xpos, ypos.next(), text)
+    if cum and log:
+        pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.5, ymax=10**3.5)
+    else:
+        pyplot.axis(xmin=0.8, xmax=3.0)
     pyplot.xlabel('log10(diameter [m])')
-    pyplot.ylabel('cumulative frequency')
+    ylabel = 'frequency'
+    if relative:
+        ylabel = 'relative ' + ylabel
+    if cum:
+        ylabel = 'cumulative ' + ylabel
+    pyplot.ylabel(ylabel)
     pyplot.legend(loc='lower left')
-    pyplot.savefig(output_filename_base+'_sizefreq.pdf', dpi=300)
+    pyplot.savefig(output_filename_base+'_'+pre+'sizefreq.pdf', dpi=300)
     pyplot.close()
 
 
-def plot_sizefreq(size, bins=10000, label=''):
-    h, b = numpy.histogram(numpy.log10(size), bins)
-    c = numpy.cumsum(h[::-1])
-    c = c[::-1]
-    c = numpy.concatenate((c[0:1], c))
-    ax = pyplot.plot(b, c, ls='steps-pre', label=label)
-    pyplot.gca().set_yscale('log')
-    return b, c
+def plot_sizefreq(size, bins=None, label='', cum=True, log=True, relative=None):
+    size = numpy.log10(size)
+    if bins is None and cum is False:
+        bins = optimal_bins(size)
+    elif cum:
+        bins = 10000
+    h, b = numpy.histogram(size, bins)
+    if cum:
+        c = numpy.cumsum(h[::-1])
+        c = c[::-1]
+        h = numpy.concatenate((c[0:1], c))
+    else:
+        h = numpy.concatenate((h[0:1]*0, h))
+    ls = 'steps-pre'
+    if relative is not None:
+        ax = pyplot.plot(b, relative-h, ls=ls, label=label)
+        pyplot.hlines(0.0, 0.8, 3.0, linestyles='dotted')
+    else:
+        ax = pyplot.plot(b, h, ls=ls, label=label)
+    if log:
+        pyplot.gca().set_yscale('log')
+    return b, h
+
+
+def optimal_bin_width(x):
+    # A first-order attempt at selecting an optimum histogram bin-width
+    # from Scott (1979) as given in Wand (1997).
+    n = len(x)
+    sigma = x.std()
+    lq, hq = numpy.percentile(x, (25, 75))
+    iqr = hq-lq
+    sigma_hat = min(sigma, iqr/1.349)
+    h = 3.49 * sigma_hat * n**(-1.0/3.0)
+    return h
+
+def optimal_bins(x):
+    nbins = (x.max() - x.min())/optimal_bin_width(x)
+    return nbins
 
 
 def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-                 user_weights=None, crater_score=None):
+                 user_weights=None, crater_score=None, img=None):
     pyplot.figure()
     ax = pyplot.subplot(111)
     radius_min, radius_max = (points['radius'].min(), points['radius'].max())
@@ -589,6 +654,13 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     ax.set_xlim(long_min, long_max)
     ax.set_ylim(lat_min, lat_max)
     msel = points['minsize'].astype(numpy.bool)
+
+    if img is not None and img.lower() != 'none':
+        import Image
+        img = Image.open(img)
+        a = numpy.asarray(img)
+        ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
+
     draw_craters(points[msel], c='r', lw=0.25)
     draw_craters(points[numpy.logical_not(msel)], c='r', lw=0.5)
     if truth is not None:
@@ -675,7 +747,7 @@ def main(argv=None):
             if o in ("-f", "--force"):
                 clobber = True
         for i in range(len(args)):
-            if i > 2:
+            if i > 3:
                 args[i] = float(args[i])
         if len(args) > 0:
             output = args[0]+'_craters.csv'
