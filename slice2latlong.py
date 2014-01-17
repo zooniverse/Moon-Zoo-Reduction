@@ -23,6 +23,7 @@ import os, sys, getopt
 from math import pi
 import numpy
 from multiprocessing import Pool
+import pymysql
 
 # Some debugging tools:
 from IPython import embed
@@ -30,7 +31,6 @@ from IPython import embed
 degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
 
 def read_db(nac_name, db='moonzoo'):
-    import pymysql
     db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
     cur = db.cursor() 
     sql = "SELECT * FROM slice_counts WHERE nac_name='%s';"%nac_name
@@ -42,12 +42,11 @@ def read_db(nac_name, db='moonzoo'):
 
 
 def write_db(data, db='moonzoo'):
-    import pymysql
     db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
     cur = db.cursor() 
     sql = "UPDATE slice_counts SET long_min=%f, long_max=%f, lat_min=%f, lat_max=%f where asset_id=%i;"
     for d in data:
-        cur.execute(sql%d)
+        cur.execute(sql%tuple(d))
     db.commit()
     db.close()
 
