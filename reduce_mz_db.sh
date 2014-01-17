@@ -57,6 +57,11 @@ rm -rf neatx
 git config --global user.name "Steven"
 git config --global user.email steven@stevenbamford.com
 
+#p4merge
+wget http://filehost.perforce.com/perforce/r13.4/bin.linux26x86_64/p4v.tgz
+cd /usr/local
+sudo tar xzf ~/p4v.tgz --strip=1
+
 # add swap
 sudo mkswap /dev/xvde
 sudo swapon /dev/xvde
