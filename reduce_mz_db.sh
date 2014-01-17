@@ -76,7 +76,7 @@ sudo mount /dev/xvdh /mnt
 sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
 cd /mnt
 sudo mkdir isis3
-sudo chown -R ubuntu:ubuntu /mnt/isis3
+sudo chown -R steven:steven /mnt/isis3
 cd isis3
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::x86-64_linux_UBUNTU/isis .
 rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/base data/
@@ -96,7 +96,7 @@ sudo mkdir /mnt/log/mysql
 sudo mkdir /mnt/csv
 sudo chown -R mysql:mysql /mnt/log/mysql
 sudo chown -R mysql:mysql /mnt/lib/mysql
-sudo chown -R mysql:ubuntu /mnt/csv
+sudo chown -R mysql:steven /mnt/csv
 sudo aa-complain /usr/sbin/mysqld
 sudo mysql_install_db --ldata=/mnt/lib/mysql
 
@@ -106,7 +106,7 @@ sudo cp ~/ec2.cnf /etc/mysql/conf.d/
 sudo restart mysql
 
 sudo mkdir /mnt/moonzoo
-sudo chown -R ubuntu:ubuntu /mnt/moonzoo
+sudo chown -R steven:steven /mnt/moonzoo
 cd /mnt/moonzoo
 
 # get scripts
@@ -188,12 +188,13 @@ cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
 
 mkdir markings
 cat create_classification_stats.sql | mysql -uroot moonzoo
-cat selected_nacs | xargs -I{} python pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
+cat selected_nacs | xargs -I{} python scripts/pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
+cat selected_nacs | xargs -I{} python scripts/slice2latlong.py moonzoo cub/{}.cub {} &> slice2latlong.py.out
 
 mkdir clusters
 . ./test_clustering_uw.sh; wait; . ./test_clustering_w.sh
 
 # full clustering!
 cat create_user_weights.sql | mysql -uroot moonzoo
-( cat selected_nacs | xargs -I{} python mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
+( cat selected_nacs | xargs -I{} python scripts/mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
     1.0 2 10 3 4.0 0.4 0.5 30.655 30.800 20.125 20.255 &> mz_cluster.py.out ) &

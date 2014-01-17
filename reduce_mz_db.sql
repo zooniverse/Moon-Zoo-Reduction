@@ -251,3 +251,44 @@ from results
 where task_id=2 and answer_id=3;
 
 -- boulders are more complicated as need to get both asset_ids
+
+drop table if exists asset_counts;
+create table `asset_counts`
+select asset_id, count(*) as nviews from asset_classifications group by asset_id;
+
+drop table if exists slice_counts;
+create table `slice_counts` (
+  `asset_id` int(11) default null,
+  `nviews` int(11) default null,
+  `nac_name` varchar(255) default null,
+  `zoom` real default null,
+  `x_min` int(11) default null,
+  `x_max` int(11) default null,
+  `y_min` int(11) default null,
+  `y_max` int(11) default null,
+  `long_min` real default null,
+  `long_max` real default null,
+  `lat_min` real default null,
+  `lat_max` real default null,
+  index (asset_id)
+);
+insert into slice_counts (asset_id, nviews, nac_name, zoom, x_min, x_max, y_min, y_max)
+select asset_id, nviews, parent_name, zoom,
+case
+    when transfo % 2 = 0 then x_min + parent_trim_left
+    else x_min + parent_trim_right
+end as x_min,
+case
+    when transfo % 2 = 0 then x_max + parent_trim_left
+    else x_max + parent_trim_right
+end as x_max,
+case
+    when transfo < 2 then y_min
+    else parent_image_height - y_min
+end as y_min,
+case
+    when transfo < 2 then y_max
+    else parent_image_height - y_max
+end as y_max
+from asset_counts, assetinfo
+where asset_id = id;

@@ -105,6 +105,8 @@ def untransform_craters():
     xnac = t.cols.xnac
     ynac = t.cols.ynac
 
+    # I think this will need some modification to handle cases where a
+    # left image has been transformed
     expr = Expr('where(transfo % 2 == 0, xtranac + ltrim, xtranac + rtrim)')
     expr.setOutput(xnac)
     expr.eval()
