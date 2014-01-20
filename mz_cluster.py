@@ -30,6 +30,7 @@ import scipy.cluster
 import fastcluster
 from collections import Container
 from numpy.lib.recfunctions import append_fields
+import pymysql
 
 # Some debugging tools:
 #from IPython import embed
@@ -294,7 +295,6 @@ def write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_sco
 
     
 def get_user_weights(userids, db='moonzoo'):
-    import pymysql
     if (userids == 0).all():
         return numpy.ones(len(userids), numpy.float)
     else:
@@ -616,8 +616,53 @@ def plot_cumsizefreq(size, bins=10000, label=''):
     return b, c
 
 
+def get_coverage(nac_names=['M104311715RE'], db='moonzoo'):
+    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+    cur = db.cursor() 
+    nac_names = '("'+'","'.join(nac_names)+'")'
+    sql = "SELECT nviews, zoom, long_min, long_max, lat_min, lat_max FROM slice_counts WHERE nac_name in %s;"%nac_names
+    cur.execute(sql)
+    names = [d[0] for d in cur.description]
+    data = numpy.rec.fromrecords(cur.fetchall(), names=names)
+    db.close()
+    return data
+
+
+def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, img=None):
+
+    #SPLIT BY ZOOM!
+
+    alpha = 0.05
+    pyplot.figure()
+    ax = pyplot.subplot(111)
+    ax.set_xlim(long_min, long_max)
+    ax.set_ylim(lat_min, lat_max)
+
+    if img is not None and img.lower() != 'none':
+        import Image
+        img = Image.open(img)
+        a = numpy.asarray(img)
+        ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
+
+    data = get_coverage()
+    for nviews, zoom, long1, long2, lat1, lat2 in data:
+        if not (long2 < long_min or long1 > long_max or lat2 < lat_min or lat1 > lat_max):
+            if zoom < 2:
+                c = 'r'
+            elif zoom < 6:
+                c = 'g'
+            else:
+                c = 'b'
+            a = min(alpha*nviews, 1.0)
+            print long1, lat1, long2-long1, lat2-lat1, c, a
+            ax.add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', alpha=a))
+    ax.set_aspect('equal')
+    pyplot.savefig(output_filename_base+'_coverage.pdf', dpi=300)
+    pyplot.close()
+
+
 def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
-                 user_weights=None, crater_score=None):
+                 user_weights=None, crater_score=None, img=None):
     pyplot.figure()
     ax = pyplot.subplot(111)
     radius_min, radius_max = (points['radius'].min(), points['radius'].max())
