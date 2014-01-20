@@ -7,7 +7,7 @@
     Usage:
         mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <expert_markings_csv>
                       <threshold> <mincount> <maxcount> <maxiter> <position_scale> <size_scale>
-                      <min_user_weight> <long_min> <long_max> <lat_min> <lat_max>
+                      <min_user_weight> <long_min> <long_max> <lat_min> <lat_max> <image>
 
     Note that the csv files must contain column headers, including 'long', 'lat' and 'xradius'.
     
@@ -45,9 +45,6 @@ from crater_metrics import crater_cdist, crater_pdist, crater_absolute_position_
 
 matplotlib.rcParams.update({'font.size': 14})
 
-# minimum size is still hardcoded - needs to adapt to NAC pixel scale,
-# and preferably use knowledge of zoom level of each marking
-
 degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 
 minsize_factor = 0.5  # downweight minsize markings by this factor
@@ -56,7 +53,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
                expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
-               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
+               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0,
+               image='none'):
     #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
     """Runs clustering routine.
 
@@ -83,7 +81,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     min_user_weight -- minimum user weight to be included at all
                        if this is >= 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
-    img -- image to put underneath crater plots
+    image -- image to put underneath crater plots
     
     This could incorporate user weighting in future, e.g. by assigning
     clusters scores based on the sum of the user weights for each
@@ -616,48 +614,53 @@ def plot_cumsizefreq(size, bins=10000, label=''):
     return b, c
 
 
-def get_coverage(nac_names=['M104311715RE'], db='moonzoo'):
+def get_coverage(nac_names, point=None, db='moonzoo'):
     db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
     cur = db.cursor() 
     nac_names = '("'+'","'.join(nac_names)+'")'
-    sql = "SELECT nviews, zoom, long_min, long_max, lat_min, lat_max FROM slice_counts WHERE nac_name in %s;"%nac_names
-    cur.execute(sql)
-    names = [d[0] for d in cur.description]
-    data = numpy.rec.fromrecords(cur.fetchall(), names=names)
+    if point is not None:
+        point = 'and %f between long_min and long_max and %f between lat_min and lat_max'%point
+    else:
+        point = ''
+    data = []
+    for zoom in ("> 6", "between 2 and 6", "< 2"):
+        sql = "SELECT nviews, zoom, long_min, long_max, lat_min, lat_max FROM slice_counts WHERE nac_name in %s and zoom %s %s;"%(nac_names, zoom, point)
+        cur.execute(sql)
+        names = [d[0] for d in cur.description]
+        data.append(numpy.rec.fromrecords(cur.fetchall(), names=names))
     db.close()
     return data
 
 
-def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, img=None):
-
-    #SPLIT BY ZOOM!
-
-    alpha = 0.05
+def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, 
+                  nac_names=['M104311715RE'], img='../New_CC/ROI_715.png'):
+    alpha = 0.1
     pyplot.figure()
-    ax = pyplot.subplot(111)
-    ax.set_xlim(long_min, long_max)
-    ax.set_ylim(lat_min, lat_max)
 
     if img is not None and img.lower() != 'none':
         import Image
         img = Image.open(img)
         a = numpy.asarray(img)
         ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
-
-    data = get_coverage()
-    for nviews, zoom, long1, long2, lat1, lat2 in data:
-        if not (long2 < long_min or long1 > long_max or lat2 < lat_min or lat1 > lat_max):
-            if zoom < 2:
-                c = 'r'
-            elif zoom < 6:
-                c = 'g'
-            else:
-                c = 'b'
-            a = min(alpha*nviews, 1.0)
-            print long1, lat1, long2-long1, lat2-lat1, c, a
-            ax.add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', alpha=a))
-    ax.set_aspect('equal')
-    pyplot.savefig(output_filename_base+'_coverage.pdf', dpi=300)
+        
+    data = get_coverage(nac_names)
+    for i, datazoom in enumerate(data):
+        ax = pyplot.subplot(3, 1, i+1)
+        ax.set_xlim(long_min, long_max)
+        ax.set_ylim(lat_min, lat_max)
+        for nviews, zoom, long1, long2, lat1, lat2 in datazoom:
+            if not (long2 < long_min or long1 > long_max or lat2 < lat_min or lat1 > lat_max):
+                if zoom < 2:
+                    c = 'r'
+                elif zoom < 6:
+                    c = 'g'
+                else:
+                    c = 'b'
+                a = min(alpha*nviews, 1.0)
+                print long1, lat1, long2-long1, lat2-lat1, c, a
+                ax.add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', alpha=a))
+        ax.set_aspect('equal')
+    pyplot.savefig(output_filename_base+'_coverage.pdf'%i, dpi=300)
     pyplot.close()
 
 
