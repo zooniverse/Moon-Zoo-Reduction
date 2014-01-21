@@ -5,8 +5,8 @@
     Version 2013-08-29
 
     Usage:
-        mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <expert_markings_csv> <image>
-                      <threshold> <mincount> <maxcount> <maxiter> <position_scale> <size_scale>
+        mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <nac_names> <expert_markings_csv>
+                      <image> <threshold> <mincount> <maxcount> <maxiter> <position_scale> <size_scale>
                       <min_user_weight> <long_min> <long_max> <lat_min> <lat_max>
 
     Note that the csv files must contain column headers, including 'long', 'lat' and 'xradius'.
@@ -50,7 +50,7 @@ degrees_per_metre = 360.0 / (2*pi*lunar_radius)
 minsize_factor = 0.5  # downweight minsize markings by this factor
 
 def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
-               expert_markings_csv='none', image='none',
+               nac_names='', expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
@@ -97,6 +97,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     crater_metrics.pscale = position_scale
     crater_metrics.sscale = size_scale
     # read in all data
+    nac_names = nac_names.upper().split(',')
     test=False
     if moonzoo_markings_csv.lower() == 'none':
         # If no filename specified, generate and use test data
@@ -236,11 +237,11 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-    plot_crater_stats(crater_mean, truth, output_filename_base, cum=True, log=True)
-    plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False)
-    #plot_crater_stats(crater_mean, truth, output_filename_base, cum=False, log=False, relative=True)
+    plot_crater_stats(crater_mean, truth, output_filename_base)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
     plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score, img=image)
+    if len(nac_names) > 0:
+        plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, nac_names=nac_names, img=image)
 
     if truth is not None:
         matchval = compare(crater_mean, truth)
@@ -641,21 +642,20 @@ def plot_image(img, ax, extent):
 
 def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, 
                   nac_names=['M104311715RE'], img='../New_CC/ROI_715.png'):
-    alpha = 0.05
+    alpha = 0.1
     data = get_coverage(nac_names)
     fig, ax = pyplot.subplots(3, sharex=True, sharey=True)
     for i, datazoom in enumerate(data):
         plot_image(img, ax[i], (long_min, long_max, lat_min, lat_max))
         for nviews, zoom, long1, long2, lat1, lat2 in datazoom:
             if not (long2 < long_min or long1 > long_max or lat2 < lat_min or lat1 > lat_max):
-                if zoom < 2:
-                    c = 'b'
-                elif zoom < 6:
-                    c = 'b'
+                if nviews <= 2:
+                    c = 'r'
+                elif nviews >= 5:
+                    c = 'g'
                 else:
                     c = 'b'
                 a = min(alpha*nviews, 1.0)
-                print long1, lat1, long2-long1, lat2-lat1, c, a
                 ax[i].add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', linewidth=0, alpha=a))
     y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
     fig.subplots_adjust(hspace=0.05)
@@ -686,7 +686,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     ax.set_xbound(long_min, long_max)
     ax.set_ybound(lat_min, lat_max)
     msel = points['minsize'].astype(numpy.bool)
-    plot_image(img, (long_min, long_max, lat_min, lat_max))
+    plot_image(img, ax, (long_min, long_max, lat_min, lat_max))
     draw_craters(points[msel], c='r', lw=0.25)
     draw_craters(points[numpy.logical_not(msel)], c='r', lw=0.5)
     if truth is not None:
@@ -706,9 +706,8 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
         ax.set_xbound(long_min, long_max)
         ax.set_ybound(lat_min, lat_max)
         ax.yaxis.set_major_formatter(y_formatter)
-        ax.tick_params(labelsize=8)
-        ax.set_xlabel('longitude', labelsize=10)
-        ax.set_ylabel('latitude', labelsize=10)
+        ax.set_xlabel('longitude', fontsize=10)
+        ax.set_ylabel('latitude', fontsize=10)
         if user_weights is not None:
             draw_craters(points, c='r', lw=user_weights)
         if crater_score is not None:
@@ -782,7 +781,7 @@ def main(argv=None):
             if o in ("-f", "--force"):
                 clobber = True
         for i in range(len(args)):
-            if i > 3:
+            if i > 4:
                 args[i] = float(args[i])
         if len(args) > 0:
             output = args[0]+'_craters.csv'
