@@ -5,9 +5,9 @@
     Version 2013-08-29
 
     Usage:
-        mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <expert_markings_csv>
+        mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <expert_markings_csv> <image>
                       <threshold> <mincount> <maxcount> <maxiter> <position_scale> <size_scale>
-                      <min_user_weight> <long_min> <long_max> <lat_min> <lat_max> <image>
+                      <min_user_weight> <long_min> <long_max> <lat_min> <lat_max>
 
     Note that the csv files must contain column headers, including 'long', 'lat' and 'xradius'.
     
@@ -53,8 +53,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
                expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
-               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0,
-               image='none'):
+               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
     #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
     """Runs clustering routine.
 
@@ -71,6 +70,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     output_filename_base -- basename of all output files
     moonzoo_markings_csv -- name of file containing raw crater markings
     expert_markings_csv -- name of file containing expert craters
+    image -- image to put underneath crater plots
     threshold -- general scaling of the clustering linking length
     mincount -- minimum number of markings required for a crater
     maxcount -- expected maximum number of markings for a crater
@@ -81,7 +81,6 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     min_user_weight -- minimum user weight to be included at all
                        if this is >= 100, then user weights are ignored
     long_min, long_max, lat_min, lat_max -- limits of region to consider
-    image -- image to put underneath crater plots
     
     This could incorporate user weighting in future, e.g. by assigning
     clusters scores based on the sum of the user weights for each
@@ -632,35 +631,46 @@ def get_coverage(nac_names, point=None, db='moonzoo'):
     return data
 
 
-def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, 
-                  nac_names=['M104311715RE'], img='../New_CC/ROI_715.png'):
-    alpha = 0.1
-    pyplot.figure()
-
+def plot_image(img, ax, extent):
     if img is not None and img.lower() != 'none':
         import Image
         img = Image.open(img)
         a = numpy.asarray(img)
-        ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
-        
+        ax.imshow(a, cmap='gray', extent=extent)
+
+
+def plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, 
+                  nac_names=['M104311715RE'], img='../New_CC/ROI_715.png'):
+    alpha = 0.05
     data = get_coverage(nac_names)
+    fig, ax = pyplot.subplots(3, sharex=True, sharey=True)
     for i, datazoom in enumerate(data):
-        ax = pyplot.subplot(3, 1, i+1)
-        ax.set_xlim(long_min, long_max)
-        ax.set_ylim(lat_min, lat_max)
+        plot_image(img, ax[i], (long_min, long_max, lat_min, lat_max))
         for nviews, zoom, long1, long2, lat1, lat2 in datazoom:
             if not (long2 < long_min or long1 > long_max or lat2 < lat_min or lat1 > lat_max):
                 if zoom < 2:
-                    c = 'r'
+                    c = 'b'
                 elif zoom < 6:
-                    c = 'g'
+                    c = 'b'
                 else:
                     c = 'b'
                 a = min(alpha*nviews, 1.0)
                 print long1, lat1, long2-long1, lat2-lat1, c, a
-                ax.add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', alpha=a))
-        ax.set_aspect('equal')
-    pyplot.savefig(output_filename_base+'_coverage.pdf'%i, dpi=300)
+                ax[i].add_patch(pyplot.Rectangle((long1, lat1), long2-long1, lat2-lat1, facecolor=c, edgecolor='none', linewidth=0, alpha=a))
+    y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
+    fig.subplots_adjust(hspace=0.05)
+    for a in ax:
+        a.set_autoscale_on(False)
+        a.set_aspect('equal', adjustable='box-forced')
+    for a in ax:
+        a.yaxis.set_major_formatter(y_formatter)
+        a.set_xbound(long_min, long_max)
+        a.set_ybound(lat_min, lat_max)
+        a.tick_params(labelsize=8)
+    ax[-1].set_xlabel('longitude', fontsize=10)
+    ax[1].set_ylabel('latitude', fontsize=10)
+    pyplot.setp([a.get_xticklabels() for a in ax[:-1]], visible=False)
+    pyplot.savefig(output_filename_base+'_coverage.pdf', dpi=300)
     pyplot.close()
 
 
@@ -673,29 +683,32 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     radius_min /= 2.0
     radius_max *= 2.0
     log10radius_min, log10radius_max = numpy.log10((radius_min, radius_max))
-    ax.set_xlim(long_min, long_max)
-    ax.set_ylim(lat_min, lat_max)
+    ax.set_xbound(long_min, long_max)
+    ax.set_ybound(lat_min, lat_max)
     msel = points['minsize'].astype(numpy.bool)
-
-    if img is not None and img.lower() != 'none':
-        import Image
-        img = Image.open(img)
-        a = numpy.asarray(img)
-        ax.imshow(a, cmap='gray', extent=(long_min, long_max, lat_min, lat_max))
-
+    plot_image(img, (long_min, long_max, lat_min, lat_max))
     draw_craters(points[msel], c='r', lw=0.25)
     draw_craters(points[numpy.logical_not(msel)], c='r', lw=0.5)
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
-    ax.set_aspect('equal')
+    ax.set_aspect('equal', adjustable='box')
+    y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
+    ax.yaxis.set_major_formatter(y_formatter)
+    ax.tick_params(labelsize=8)
+    ax.set_xlabel('longitude', fontsize=10)
+    ax.set_ylabel('latitude', fontsize=10)
     pyplot.savefig(output_filename_base+'_craters.pdf', dpi=300)
     pyplot.close()
-    pyplot.figure()
-    ax = pyplot.subplot(111)
-    ax.set_xlim(long_min, long_max)
-    ax.set_ylim(lat_min, lat_max)
     if (user_weights is not None) or (crater_score is not None):
+        pyplot.figure()
+        ax = pyplot.subplot(111)
+        ax.set_xbound(long_min, long_max)
+        ax.set_ybound(lat_min, lat_max)
+        ax.yaxis.set_major_formatter(y_formatter)
+        ax.tick_params(labelsize=8)
+        ax.set_xlabel('longitude', labelsize=10)
+        ax.set_ylabel('latitude', labelsize=10)
         if user_weights is not None:
             draw_craters(points, c='r', lw=user_weights)
         if crater_score is not None:
@@ -718,24 +731,24 @@ def plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat
     pyplot.plot(points['long'], points['lat'], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('long')
     pyplot.ylabel('lat')
-    ax.set_xlim(long_min, long_max)
-    ax.set_ylim(lat_min, lat_max)
+    ax.set_xbound(long_min, long_max)
+    ax.set_ybound(lat_min, lat_max)
     ax = pyplot.subplot(132)
     pyplot.plot(crater_mean['long'], numpy.log10(crater_mean['radius']), 'o', markersize=4,
                 mfc='white', mec='blue')
     pyplot.plot(points['long'], numpy.log10(points['radius']), '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('long')
     pyplot.ylabel('log10(radius)')
-    ax.set_xlim(long_min, long_max)
-    ax.set_ylim(log10radius_min, log10radius_max)
+    ax.set_xbound(long_min, long_max)
+    ax.set_ybound(log10radius_min, log10radius_max)
     ax = pyplot.subplot(133)
     pyplot.plot(numpy.log10(crater_mean['radius']), crater_mean['lat'], 'o', markersize=4,
                 mfc='white', mec='blue')
     pyplot.plot(numpy.log10(points['radius']), points['lat'], '.', mfc='red', mec='red', alpha=0.25, markersize=2)
     pyplot.xlabel('log10(radius)')
     pyplot.ylabel('lat')
-    ax.set_xlim(log10radius_min, log10radius_max)
-    ax.set_ylim(lat_min, lat_max)
+    ax.set_xbound(log10radius_min, log10radius_max)
+    ax.set_ybound(lat_min, lat_max)
     pyplot.subplots_adjust(wspace=0.3, hspace=0.3, right=0.95, top=0.95)
     pyplot.savefig(output_filename_base+'_clusters.pdf', dpi=600)
     pyplot.close()
