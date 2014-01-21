@@ -557,8 +557,22 @@ def plot_crater_sizefreq(crater_mean, truth, output_filename_base):
         ok = (sf_clust > 0) & (sf_truth > 0)
         D, p = ks_2samp(crater_mean['radius'], truth['radius'])
         text = 'KS D, p = %.3f, %.3f'%(D, p)
+        pyplot.text(1.75, 100.0, text)
         print text
-        pyplot.text(1.5, 100.0, text)
+        #delta = (sf_clust[ok].astype(numpy.float) - sf_truth[ok])/sf_truth[ok]
+        delta = (sf_clust[ok].astype(numpy.float) - sf_truth[ok])/numpy.sqrt(sf_truth[ok])
+        text = 'mean_delta = %.3f'%delta.mean()
+        print text
+        pyplot.text(1.75, 95, text)
+        text = 'med_delta = %.3f'%numpy.median(delta)
+        print text
+        pyplot.text(1.75, 90, text)
+        text = 'rms_delta = %.3f'%numpy.sqrt((delta**2).mean())
+        print text    
+        pyplot.text(1.75, 85, text)
+        text = 'mad_delta = %.3f'%numpy.median(numpy.abs(delta))
+        print text
+        pyplot.text(1.75, 80, text)
     pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.0)
     pyplot.xlabel('log10(diameter [m])')
     pyplot.ylabel('frequency')
@@ -584,16 +598,16 @@ def plot_crater_cumsizefreq(crater_mean, truth, output_filename_base):
         sf_bins_truth, sf_truth = plot_cumsizefreq(2*truth['radius'], sf_bins_clust, label='truth')
         ok = (sf_clust > 0) & (sf_truth > 0)
         delta = sf_clust[ok].astype(numpy.float)/sf_truth[ok] - 1
-        text = 'mean_delta = %.3f'%delta.mean()
+        text = 'cum_mean_delta = %.3f'%delta.mean()
         print text
         pyplot.text(1.0, 10**1.0, text)
-        text = 'med_delta = %.3f'%numpy.median(delta)
+        text = 'cum_med_delta = %.3f'%numpy.median(delta)
         print text
         pyplot.text(1.0, 10**0.8, text)
-        text = 'rms_delta = %.3f'%numpy.sqrt((delta**2).mean())
+        text = 'cum_rms_delta = %.3f'%numpy.sqrt((delta**2).mean())
         print text    
         pyplot.text(1.0, 10**0.6, text)
-        text = 'mad_delta = %.3f'%numpy.median(numpy.abs(delta))
+        text = 'cum_mad_delta = %.3f'%numpy.median(numpy.abs(delta))
         print text
         pyplot.text(1.0, 10**0.4, text)
     pyplot.axis(xmin=0.8, xmax=3.0, ymin=0.5, ymax=10**3.5)
