@@ -17,10 +17,12 @@ for f in (file(fn) for fn in files):
         if 'output_filename_base' in ls[0]:
             n = ls[2].replace('clusters/', '')
             stats.append(n[:12])
-            stats.append(n[13:])
+            stats.append(n[13:19])
+            stats.append(n[20:])
             if collect_names:
                 names.append('nac')
                 names.append('method')
+                names.append('truth')
         elif 'delta' in ls[0]:
             stats.append(float(ls[2]))
             if collect_names:
@@ -38,15 +40,15 @@ for f in (file(fn) for fn in files):
 results = [numpy.array([results[i][j] for i in xrange(len(results))]) for j in xrange(len(results[0]))]
 results = numpy.rec.fromarrays(results, names=names)
 
-results = numpy.sort(results, order=['nac', 'mad_delta']) 
+results = numpy.sort(results, order=['nac', 'truth', 'mad_delta']) 
 
 with file('test_clustering_results', 'w') as fout:
-    fmt = '%16s '*len(names)
+    fmt = '%16s '*3 + '%14s '*(len(names)-3)
     fout.write(fmt%tuple(names)+'\n')
     prevname = ''
     for r in results:
         if r[0][:12] != prevname:
             fout.write('\n')
             prevname = r[0][:12]
-        fmt = '%16s %16s ' + ('%16.3f '*(len(r)-2))
+        fmt = '%16s %16s %16s ' + ('%14.3f '*(len(r)-2))
         fout.write(fmt%tuple(r)+'\n')

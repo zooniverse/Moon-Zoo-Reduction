@@ -2,7 +2,7 @@
 
 """mz_cluster.py - Perform clustering on MZ data.
 
-    Version 2013-08-29
+    Version 2014-02-26
 
     Usage:
         mz_cluster.py <output_filename_base> <moonzoo_markings_csv> <nac_names> <expert_markings_csv>
@@ -111,8 +111,10 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
         truth = numpy.genfromtxt(expert_markings_csv, delimiter=',', names=True)
         if truth.dtype.names[:3] != ('long', 'lat', 'radius'):
             # this is a cat from Rob, rather than an internal test cat
-            truth.dtype.names = ('long', 'lat', 'radius') + truth.dtype.names[3:]
-            truth['radius'] /= 2.0  # fix diameter to radius
+            # the format of these files changes every time
+            #truth.dtype.names = ('long', 'lat', 'radius') + truth.dtype.names[3:]
+            truth.dtype.names = ('radius', 'x', 'y', 'long', 'lat')
+            #truth['radius'] /= 2.0  # fix diameter to radius
             n = len(truth)
             truth = numpy.rec.fromarrays([truth['long'], truth['lat'], truth['radius'],
                                           numpy.ones(n, numpy.float), numpy.zeros(n, numpy.float),
@@ -156,6 +158,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     points = points[select]
     user_weights = user_weights[select]
     smallest_radius = points['radius'].min()
+    smallest_expert_radius = truth['radius'].min()
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
@@ -165,6 +168,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     print('Radius of smallest marking: %.3f'%smallest_radius)
     if expert_markings_csv is not None:
         print('Number of expert markings: %i'%truth.shape[0])
+        print('Radius of smallest expert marking: %.3f'%smallest_expert_radius)
     # Perform clustering of markings
     p = numpy.array([points[name] for name in ('long', 'lat', 'radius', 'minsize')], numpy.double)
     p[0:2] *= pi/180.0
@@ -233,24 +237,28 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     crater_stdev = crater_stdev[['long', 'lat', 'radius', 'axialratio', 'angle', 'boulderyness']]
     print('Found %i final clusters'%len(crater_count))
 
+    crater_mean_for_comparison = crater_mean[crater_mean['radius'] > smallest_expert_radius]
+    print('Only computing stats for set of %i craters larger than smallest truth crater'%len(crater_mean_for_comparison))
+
     # Write final crater catalogue to a csv file
     write_crater_cat(output_filename_base, crater_mean, crater_stdev, crater_score, crater_count, crater_countnotmin)
     # Make some plots
     plot_cluster_stats(dra, drs, ds, s, notmin, output_filename_base)
-    plot_crater_stats(crater_mean, truth, output_filename_base)
+    plot_crater_stats(crater_mean_for_comparison, truth, output_filename_base)
     plot_cluster_diagnostics(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base)
     plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base, user_weights, crater_score, img=image)
     if len(nac_names) > 0:
         plot_coverage(long_min, long_max, lat_min, lat_max, output_filename_base, nac_names=nac_names, img=image)
 
     if truth is not None:
-        matchval = compare(crater_mean, truth)
+        matchval = compare(crater_mean_for_comparison, truth)
         print("\nMedian metric distance between nearest neighbours: %.3f"%matchval)
 
     if truth is not None:
         # And now computing and applying offsets...
         print('\nDetermining position offset between clustered craters and truth')
-        offset = find_offset(truth, crater_mean)
+        offset = find_offset(truth, crater_mean_for_comparison)
+        crater_mean_for_comparison = apply_offset(crater_mean_for_comparison, offset)
         crater_mean = apply_offset(crater_mean, offset)
         points = apply_offset(points, offset)
         output_filename_base += '_offset'
@@ -260,7 +268,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
         plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_max, output_filename_base,
                      user_weights, crater_score, img=image)
         if truth is not None:
-            matchval = compare(crater_mean, truth)
+            matchval = compare(crater_mean_for_comparison, truth)
             print("\nMedian metric distance between nearest neighbours after offset: %.3f"%matchval)
     
     # If this is a test we know the true clustering, which can be used to evaluate performance
