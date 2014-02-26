@@ -52,7 +52,7 @@ minsize_factor = 0.5  # downweight minsize markings by this factor
 def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
                expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
-               position_scale=4.0, size_scale=0.4, min_user_weight=0.5,
+               position_scale=0.2, size_scale=0.2, min_user_weight=0.5,
                long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0,
                image='none'):
     #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
@@ -76,7 +76,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     maxcount -- expected maximum number of markings for a crater
     maxiter -- maximum number of iterations for splitting too-large clusters
     position_scale -- maximum positional difference for linking two markings,
-                      normalised by the square root of the crater size
+                      normalised by the crater size
     size_scale -- maximum fractional size difference for linking two markings
     min_user_weight -- minimum user weight to be included at all
                        if this is >= 100, then user weights are ignored

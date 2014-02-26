@@ -87,7 +87,7 @@ cpdef numpy.ndarray[DTYPE_t, ndim=1] crater_metric(numpy.ndarray[DTYPE_t, ndim=1
     hdLat = (lat2 - lat1)/2.0
     hdLong = (long2 - long1)/2.0
     x = sin(hdLat)**2 + sin(hdLong)**2 * cos(lat1) * cos(lat2)
-    dr = lunar_diameter * arcsin(sqrt(x)) / sqrt(sm)
+    dr = lunar_diameter * arcsin(sqrt(x)) / sm
     # combine position and size differences
     dr /= pscale
     ds /= sscale
@@ -102,7 +102,7 @@ def crater_numexpr_metric(uin, vin):
     # calculate crater size difference
     ds = '(1-m1) * (1-m2) * abs(s1 - s2) / ((s1 + s2)/2.0)'
     # calculate crater position difference
-    dr = 'lunar_diameter*arcsin(sqrt(sin((lat2 - lat1)/2.0)**2 + sin((long2 - long1)/2.0)**2 * cos(lat1) * cos(lat2))) / sqrt((s1 + s2)/2.0)'
+    dr = 'lunar_diameter*arcsin(sqrt(sin((lat2 - lat1)/2.0)**2 + sin((long2 - long1)/2.0)**2 * cos(lat1) * cos(lat2))) / ((s1 + s2)/2.0)'
     # combine position and size differences
     dr /= pscale
     ds /= sscale
@@ -136,7 +136,7 @@ def crater_position_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTY
     hdLat = (lat2 - lat1)/2.0
     hdLong = (long2 - long1)/2.0
     x = sin(hdLat)**2 + sin(hdLong)**2 * cos(lat1) * cos(lat2)
-    dr = lunar_diameter * arcsin(sqrt(x)) / sqrt(sm)
+    dr = lunar_diameter * arcsin(sqrt(x)) / sm
     return dr
 
 def crater_size_metric(numpy.ndarray[DTYPE_t, ndim=1] uin, numpy.ndarray[DTYPE_t, ndim=2] vin):
