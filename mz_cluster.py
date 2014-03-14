@@ -158,7 +158,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
     points = points[select]
     user_weights = user_weights[select]
     smallest_radius = points['radius'].min()
-    smallest_expert_radius = truth['radius'].min()
+    smallest_expert_radius = truth['radius'].min() if truth is not None else 0.0
     if truth is not None:
         select = (truth['long'] >= long_min) & (truth['long'] <= long_max)
         select &= (truth['lat'] >= lat_min) & (truth['lat'] <= lat_max)
@@ -166,7 +166,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
         truth = truth[select]
     print('\nNumber of markings: %i'%points.shape[0])
     print('Radius of smallest marking: %.3f'%smallest_radius)
-    if expert_markings_csv is not None:
+    if truth is not None:
         print('Number of expert markings: %i'%truth.shape[0])
         print('Radius of smallest expert marking: %.3f'%smallest_expert_radius)
     # Perform clustering of markings
@@ -226,8 +226,8 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
             notmin.extend(notminsize)
     dra, drs, ds, s, notmin = map(numpy.array, (dra, drs, ds, s, notmin))
     # select final craters exceeding specified score
-    # also reject craters with only one notmin marking
-    ok = (crater_score >= mincount) & (crater_countnotmin != 1)
+    # also reject craters with one or fewer notmin markings
+    ok = (crater_score >= mincount) & (crater_countnotmin > 1)
     crater_score = crater_score[ok]
     crater_count = crater_count[ok]
     crater_countnotmin = crater_countnotmin[ok]
@@ -714,6 +714,7 @@ def plot_craters(points, crater_mean, truth, long_min, long_max, lat_min, lat_ma
     if truth is not None:
         draw_craters(truth, c='g', lw=2)
     draw_craters(crater_mean, c='b', lw=1)
+    pyplot.axis((long_min, long_max, lat_min, lat_max))
     ax.set_aspect('equal', adjustable='box')
     y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
     ax.yaxis.set_major_formatter(y_formatter)
