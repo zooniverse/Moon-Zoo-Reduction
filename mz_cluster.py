@@ -53,8 +53,7 @@ def mz_cluster(output_filename_base='mz_clusters', moonzoo_markings_csv='none',
                nac_names='', expert_markings_csv='none', image='none',
                threshold=1.0, mincount=2.0, maxcount=10, maxiter=3,
                position_scale=0.2, size_scale=0.2, min_user_weight=0.5,
-               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0,
-               image='none'):
+               long_min=-720.0, long_max=720.0, lat_min=-360.0, lat_max=360.0):
     #long_min=30.655, long_max=30.800, lat_min=20.125, lat_max=20.255):
     """Runs clustering routine.
 
