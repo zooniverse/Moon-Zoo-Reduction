@@ -111,7 +111,7 @@ sliced_boulders integer default 0,
 sliced_craters integer default 0,
 description text
 );
-load data infile '/mnt/moonzoo/mzimages.csv'
+load data infile '/home/ppzsb1/quickdata/moonzoo/mzimages.csv'
 into table mzimages
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
@@ -148,13 +148,13 @@ created_at datetime not null,
 location varchar(255) default null,
 thumb_location varchar(255) default null
 );
-load data infile '/mnt/moonzoo/mzslices.csv'
+load data infile '/home/ppzsb1/quickdata/moonzoo/mzslices.csv'
 into table mzslices
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 ignore 1 lines;
 
-create unique index name on assets (name);
+create unique index name_index on assets (name);
 
 drop table if exists assetinfo;
 create table `assetinfo` (
@@ -238,13 +238,13 @@ select annotation_id, classification_id, task_id, answer_id, parent_name as nac_
 from x, assetinfo as assets
 where x.asset_id=assets.id;
 
-select * into outfile '/mnt/csv/mz_results_craters.csv'
+select * into outfile '/home/ppzsb1/quickdata/moonzoo/csv/mz_results_craters.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results
 where task_id=1 and answer_id=1;
 
-select * into outfile '/mnt/csv/mz_results_regions.csv'
+select * into outfile '/home/ppzsb1/quickdata/moonzoo/csv/mz_results_regions.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results

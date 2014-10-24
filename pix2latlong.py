@@ -52,7 +52,7 @@ max_markings_per_slice = 25
 
 def read_db(nac_name, db='moonzoo'):
     import pymysql
-    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+    db = pymysql.connect(host="localhost", user="root", passwd="pppzsb2", db=db)
     cur = db.cursor() 
     sql = """SELECT xnac, ynac, x_diameter_nac, y_diameter_nac, 
                     angle, boulderyness, zoom, zooniverse_user_id

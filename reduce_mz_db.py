@@ -4,7 +4,7 @@ from string import strip
 import numpy
 import csv
 
-datapath = '/mnt/moonzoo/'
+datapath = '/home/ppzsb1/quickdata/moonzoo/csv/'
 
 rnames = ['annotation_id', 'classification_id', 'task_id', 'answer_id', 'nac_name', 'asset_id', 'name',
           'asset_created_at', 'value', 'x_min', 'x_max', 'y_min', 'y_max', 'parent_trim_left', 'parent_trim_right',

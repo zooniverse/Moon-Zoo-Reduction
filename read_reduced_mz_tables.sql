@@ -42,7 +42,7 @@ create table `craters` (
   index (asset_id),
   index (task_id)
 );
-load data infile '/mnt/moonzoo/mz_craters.csv'
+load data infile '/home/ppzsb1/quickdata/moonzoo/csv/mz_craters.csv'
 into table craters
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
@@ -91,7 +91,7 @@ create table `regions` (
   index (asset_id),
   index (task_id)
 );
-load data infile '/mnt/moonzoo/mz_regions.csv'
+load data infile '/home/ppzsb1/quickdata/moonzoo/csv/mz_regions.csv'
 into table regions
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'

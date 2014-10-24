@@ -31,7 +31,7 @@ from IPython import embed
 degrees_per_metre = 360.0 / (2*pi*1737.4*1000)
 
 def read_db(nac_name, db='moonzoo'):
-    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+    db = pymysql.connect(host="localhost", user="root", passwd="pppzsb2", db=db)
     cur = db.cursor() 
     sql = "SELECT * FROM slice_counts WHERE nac_name='%s';"%nac_name
     cur.execute(sql)
@@ -42,7 +42,7 @@ def read_db(nac_name, db='moonzoo'):
 
 
 def write_db(data, db='moonzoo'):
-    db = pymysql.connect(host="localhost", user="root", passwd="", db=db)
+    db = pymysql.connect(host="localhost", user="root", passwd="pppzsb2", db=db)
     cur = db.cursor() 
     sql = "UPDATE slice_counts SET long_min=%f, long_max=%f, lat_min=%f, lat_max=%f where asset_id=%i;"
     for d in data:
