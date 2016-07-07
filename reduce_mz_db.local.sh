@@ -32,17 +32,19 @@ mkdir ~/quickdata/moonzoo
 cd ~/quickdata/moonzoo
 
 # get scripts
-git clone git@bitbucket.org:bamford/moon-zoo-scripts.git scripts
+git clone https://github.com/zooniverse/Moon-Zoo-Reduction.git scripts
 
 wget http://zooniverse-code.s3.amazonaws.com/databases/161014/moonzoo_production_161014.sql.gz
+# Get latest database:
+# moonzoo_production_2016-07-05.sql.gz from Adam McMaster via Slack and Dropbox
 wget http://moonzoo.s3.amazonaws.com/v10/database/MZP.db
 wget -OMZP_A17.db http://moonzoo.s3.amazonaws.com/v21/database/MZP.db
 wget -OMZP_A12.db http://moonzoo.s3.amazonaws.com/v23/database/MZP.db
-wget http://moonzoo.s3.amazonaws.com/reduction/sep2013/reduce_mz_db.sql
-wget http://moonzoo.s3.amazonaws.com/reduction/sep2013/reduce_mz_db.py
+#wget http://moonzoo.s3.amazonaws.com/reduction/sep2013/reduce_mz_db.sql
+#wget http://moonzoo.s3.amazonaws.com/reduction/sep2013/reduce_mz_db.py
 
 echo 'create database moonzoo' | mysql -uroot -ppppzsb2
-cat moonzoo_production_161014.sql.gz | gunzip | mysql -uroot -ppppzsb2 moonzoo &
+cat moonzoo_production_2016-07-05.sql.gz | gunzip | mysql -uroot -ppppzsb2 moonzoo &
 
 echo '.mode csv 
 .header on 
@@ -71,7 +73,13 @@ select * from mzslices;' | sqlite3 MZP_A12.db
 cat mzimages_a12.csv >> mzimages.csv
 cat mzslices_a12.csv >> mzslices.csv
 
+cat read_mzp_db.sql | mysql -uroot -ppppzsb2 moonzoo &> read_mzp_db.sql.out &
+
+cat reduce_mz_db_boulders.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db_boulders.sql.out &
+
 cat reduce_mz_db.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db.sql.out &
+
+python reduce_mz_db_boulders.py &> reduce_mz_db_boulders.py.out &
 
 python reduce_mz_db.py &> reduce_mz_db.py.out & # actually done function by function last time
 
