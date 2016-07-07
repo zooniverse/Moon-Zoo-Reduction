@@ -73,17 +73,21 @@ select * from mzslices;' | sqlite3 MZP_A12.db
 cat mzimages_a12.csv >> mzimages.csv
 cat mzslices_a12.csv >> mzslices.csv
 
-cat read_mzp_db.sql | mysql -uroot -ppppzsb2 moonzoo &> read_mzp_db.sql.out &
+mkdir csv
 
-cat reduce_mz_db_boulders.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db_boulders.sql.out &
+cat scripts/read_mzp_db.sql | mysql -uroot -ppppzsb2 moonzoo &> read_mzp_db.sql.out &
 
-cat reduce_mz_db.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db.sql.out &
+cat scripts/reduce_mz_db_boulders.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db_boulders.sql.out &
+cp /tmp/mz_results_boulders.csv csv/
 
-python reduce_mz_db_boulders.py &> reduce_mz_db_boulders.py.out &
+cat scripts/reduce_mz_db.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db.sql.out &
+cp /tmp/mz_results_craters.csv /tmp/mz_results_regions.csv csv/
 
-python reduce_mz_db.py &> reduce_mz_db.py.out & # actually done function by function last time
+python scripts/reduce_mz_db_boulders.py &> reduce_mz_db_boulders.py.out &
 
-cat read_reduced_mz_tables.sql | mysql -uroot -ppppzsb2 moonzoo &> read_reduced_mz_tables.sql.out
+python scripts/reduce_mz_db.py &> reduce_mz_db.py.out & # actually done function by function last time
+
+cat scripts/read_reduced_mz_tables.sql | mysql -uroot -ppppzsb2 moonzoo &> read_reduced_mz_tables.sql.out
 
 wget -OMZP_v10_1.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log_2010-04-14T00:47:34.gz
 wget -OMZP_v10_2.log.gz http://moonzoo.s3.amazonaws.com/v10/logs/MZP.log_2010-04-16T00:47:06.gz

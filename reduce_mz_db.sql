@@ -57,13 +57,13 @@ select annotation_id, classification_id, task_id, answer_id, parent_name as nac_
 from x, assetinfo as assets
 where x.asset_id=assets.id;
 
-select * into outfile '/home/ppzsb1/quickdata/moonzoo/csv/mz_results_craters.csv'
+select * into outfile '/tmp/mz_results_craters.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results
 where task_id=1 and answer_id=1;
 
-select * into outfile '/home/ppzsb1/quickdata/moonzoo/csv/mz_results_regions.csv'
+select * into outfile '/tmp/mz_results_regions.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from results
