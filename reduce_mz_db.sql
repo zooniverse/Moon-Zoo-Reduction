@@ -57,6 +57,13 @@ select annotation_id, classification_id, task_id, answer_id, parent_name as nac_
 from x, assetinfo as assets
 where x.asset_id=assets.id;
 
+select GROUP_CONCAT(column_name)
+into outfile '/tmp/mz_results.csvheader'
+from information_schema.columns
+where table_name = 'results'
+and table_schema = 'moonzoo'
+order by ordinal_position;
+
 select * into outfile '/tmp/mz_results_craters.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'

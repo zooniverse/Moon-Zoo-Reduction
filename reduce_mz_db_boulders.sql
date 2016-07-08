@@ -79,10 +79,25 @@ from xb, assetinfo as first_assets, assetinfo as second_assets
 where xb.first_asset_id=first_assets.id
 and xb.second_asset_id=second_assets.id;
 
+
+select GROUP_CONCAT(column_name)
+into outfile '/tmp/mz_results_boulders.csvheader'
+from information_schema.columns
+where table_name = 'boulder_results'
+and table_schema = 'moonzoo'
+order by ordinal_position;
+
 select * into outfile '/tmp/mz_results_boulders.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 from boulder_results;
+
+select GROUP_CONCAT(column_name)
+into outfile '/tmp/mz_slices_boulders.csvheader'
+from information_schema.columns
+where table_name = 'mzslices'
+and table_schema = 'moonzoo'
+order by ordinal_position;
 
 select * into outfile '/tmp/mz_slices_boulders.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
