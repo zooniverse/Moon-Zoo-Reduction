@@ -79,27 +79,13 @@ from xb, assetinfo as first_assets, assetinfo as second_assets
 where xb.first_asset_id=first_assets.id
 and xb.second_asset_id=second_assets.id;
 
-select * from ((select column_name
-from information_schema.columns
-where table_name = 'boulder_results'
-and table_schema = 'moonzoo'
-order by ordinal_position)
-union all
-(select *
-from boulder_results)) as tbl
-into outfile '/tmp/mz_results_boulders_test.csv'
+select * into outfile '/tmp/mz_results_boulders.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
-lines terminated by '\n';
+lines terminated by '\n'
+from boulder_results;
 
-select * from ((select column_name
-from information_schema.columns
-where table_name = 'assetinfo'
-and table_schema = 'moonzoo'
-order by ordinal_position)
-union all
-(select *
-from assetinfo
-where criterion = 'boulders')) as tbl
-into outfile '/tmp/mz_slices_boulders_test.csv'
+select * into outfile '/tmp/mz_slices_boulders.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
-lines terminated by '\n';
+lines terminated by '\n'
+from mzslices
+where criterion = 'boulders';
