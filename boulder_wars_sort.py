@@ -1,7 +1,6 @@
 import numpy as np
 from math import floor
 import time
-from astropy.table import fits as pyfits
 import os
 
 # The damping procedure was been extensively tested, and the default parameters
@@ -203,9 +202,9 @@ class WarsSort:
         self._update_progress_figure()
         self.progress_figure_fig.savefig(figname)
 
-    def sort_battles(self, results_filename='../csv/mz_results_boulders.csv',
-                     images_filename='../csv/mz_images_boulders.csv',
-                     out_filename='../csv/mz_boulders_rank.csv'):
+    def sort_battles(self, results_filename='csv/mz_results_boulders.csv',
+                     images_filename='csv/mz_images_boulders.csv',
+                     out_filename='csv/mz_boulders_rank.csv'):
         p = np.genfromtxt(images_filename, delimiter=',', names=True)
         objid = p.field('id')
         rank = np.zeros(objid.shape, np.int) - 1
@@ -232,7 +231,7 @@ class WarsSort:
                 fracrank[idx] = float(r) / self.ncomp
         np.savetxt(out_filename, (objid, rank, fracrank),
                    delimiter=',',
-                   header=("objid,rank,fracrank")
+                   header=("objid,rank,fracrank"))
 
     def __enter__(self):
         return self
