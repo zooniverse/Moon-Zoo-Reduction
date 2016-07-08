@@ -27,14 +27,7 @@ create table `boulder_results` (
   `first_asset_id` int(11) default null,
   `second_asset_id` int(11) default null,
   `winner` int(11) default null,
-  `first_nac_name` varchar(255) default null,
   `first_name` varchar(255) default null,
-  `first_xmin` int(11) default null,
-  `first_xmax` int(11) default null,
-  `first_ymin` int(11) default null,
-  `first_ymax` int(11) default null,
-  `first_parent_trim_left` int(11) default null,
-  `first_parent_trim_right` int(11) default null,
   `first_zoom` real default null,
   `first_resolution` real default null,
   `first_longitude` real default null,
@@ -45,16 +38,7 @@ create table `boulder_results` (
   `first_north_azimuth` real default null,
   `first_sun_angle` real default null,
   `first_transfo` int(11) default null,
-  `first_parent_image_width` int(11) default null,
-  `first_parent_image_height` int(11) default null,
-  `second_nac_name` varchar(255) default null,
   `second_name` varchar(255) default null,
-  `second_xmin` int(11) default null,
-  `second_xmax` int(11) default null,
-  `second_ymin` int(11) default null,
-  `second_ymax` int(11) default null,
-  `second_parent_trim_left` int(11) default null,
-  `second_parent_trim_right` int(11) default null,
   `second_zoom` real default null,
   `second_resolution` real default null,
   `second_longitude` real default null,
@@ -65,16 +49,12 @@ create table `boulder_results` (
   `second_north_azimuth` real default null,
   `second_sun_angle` real default null,
   `second_transfo` int(11) default null,
-  `second_parent_image_width` int(11) default null,
-  `second_parent_image_height` int(11) default null,
   `zooniverse_user_id` int(11) default null,
-  `classification_created_at` datetime default null,
-  `time_spent` int(11) default null,
   index (first_asset_id),
   index (second_asset_id)
 );
 insert into boulder_results
-select classification_id, first_asset_id, second_asset_id, (case winner_asset_id when cast(first_asset_id as char) then 1 when cast(second_asset_id as char) then 2 else 0 end), first_assets.parent_name, first_assets.name, first_assets.x_min, first_assets.x_max, first_assets.y_min, first_assets.y_max, first_assets.parent_trim_left, first_assets.parent_trim_right, first_assets.zoom, first_assets.slice_resolution, first_assets.slice_center_longitude, first_assets.slice_center_latitude, first_assets.emmission_angle, first_assets.incidence_angle, first_assets.sub_solar_azimuth, first_assets.north_azimuth, first_assets.sun_angle, first_assets.transfo, first_assets.parent_image_width, first_assets.parent_image_height, second_assets.parent_name, second_assets.name, second_assets.x_min, second_assets.x_max, second_assets.y_min, second_assets.y_max, second_assets.parent_trim_left, second_assets.parent_trim_right, second_assets.zoom, second_assets.slice_resolution, second_assets.slice_center_longitude, second_assets.slice_center_latitude, second_assets.emmission_angle, second_assets.incidence_angle, second_assets.sub_solar_azimuth, second_assets.north_azimuth, second_assets.sun_angle, second_assets.transfo, second_assets.parent_image_width, second_assets.parent_image_height, zooniverse_user_id, classification_created_at, time_spent
+select classification_id, first_asset_id, second_asset_id, (case winner_asset_id when cast(first_asset_id as char) then 1 when cast(second_asset_id as char) then 2 else 0 end), first_assets.name, first_assets.zoom, first_assets.slice_resolution, first_assets.slice_center_longitude, first_assets.slice_center_latitude, first_assets.emmission_angle, first_assets.incidence_angle, first_assets.sub_solar_azimuth, first_assets.north_azimuth, first_assets.sun_angle, first_assets.transfo, second_assets.name, second_assets.zoom, second_assets.slice_resolution, second_assets.slice_center_longitude, second_assets.slice_center_latitude, second_assets.emmission_angle, second_assets.incidence_angle, second_assets.sub_solar_azimuth, second_assets.north_azimuth, second_assets.sun_angle, second_assets.transfo, zooniverse_user_id
 from xb, assetinfo as first_assets, assetinfo as second_assets
 where xb.first_asset_id=first_assets.id
 and xb.second_asset_id=second_assets.id;
