@@ -54,7 +54,7 @@ create table `boulder_results` (
   index (second_asset_id)
 );
 insert into boulder_results
-select classification_id, first_asset_id, second_asset_id, (case winner_asset_id when cast(first_asset_id as char) then 1 when cast(second_asset_id as char) then 2 else 0 end), first_assets.name, first_assets.zoom, first_assets.slice_resolution, first_assets.slice_center_longitude, first_assets.slice_center_latitude, first_assets.emmission_angle, first_assets.incidence_angle, first_assets.sub_solar_azimuth, first_assets.north_azimuth, first_assets.sun_angle, first_assets.transfo, second_assets.name, second_assets.zoom, second_assets.slice_resolution, second_assets.slice_center_longitude, second_assets.slice_center_latitude, second_assets.emmission_angle, second_assets.incidence_angle, second_assets.sub_solar_azimuth, second_assets.north_azimuth, second_assets.sun_angle, second_assets.transfo, zooniverse_user_id
+select classification_id, first_asset_id, second_asset_id, (case winner_asset_id when cast(first_asset_id as char) then 1 when cast(second_asset_id as char) then 2 else 0 end), first_assets.name, first_assets.zoom, first_assets.slice_resolution, first_assets.slice_center_longitude, first_assets.slice_center_latitude, first_assets.emission_angle, first_assets.incidence_angle, first_assets.sub_solar_azimuth, first_assets.north_azimuth, first_assets.sun_angle, first_assets.transfo, second_assets.name, second_assets.zoom, second_assets.slice_resolution, second_assets.slice_center_longitude, second_assets.slice_center_latitude, second_assets.emission_angle, second_assets.incidence_angle, second_assets.sub_solar_azimuth, second_assets.north_azimuth, second_assets.sun_angle, second_assets.transfo, zooniverse_user_id
 from xb, assetinfo as first_assets, assetinfo as second_assets
 where xb.first_asset_id=first_assets.id
 and xb.second_asset_id=second_assets.id;
@@ -73,14 +73,14 @@ lines terminated by '\n'
 from boulder_results;
 
 select GROUP_CONCAT(column_name)
-into outfile '/tmp/mz_slices_boulders.csvheader'
+into outfile '/tmp/mz_images_boulders.csvheader'
 from information_schema.columns
-where table_name = 'mzslices'
+where table_name = 'assetinfo'
 and table_schema = 'moonzoo'
 order by ordinal_position;
 
-select * into outfile '/tmp/mz_slices_boulders.csv'
+select * into outfile '/tmp/mz_images_boulders.csv'
 fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
-from mzslices
+from assetinfo
 where criterion = 'boulders';

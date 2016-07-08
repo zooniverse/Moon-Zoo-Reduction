@@ -169,7 +169,7 @@ create table `assetinfo` (
   `slice_resolution` double DEFAULT NULL,
   `slice_center_longitude` double DEFAULT NULL,
   `slice_center_latitude` double DEFAULT NULL,
-  `emmission_angle` float DEFAULT NULL,
+  `emission_angle` float DEFAULT NULL,
   `incidence_angle` float DEFAULT NULL,
   `sub_solar_azimuth` float DEFAULT NULL,
   `north_azimuth` float DEFAULT NULL,
