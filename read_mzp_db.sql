@@ -178,7 +178,7 @@ create table `assetinfo` (
 );
 insert into assetinfo
 select assets.*,
-       parent_name, parent_trim_left, parent_trim_right, zoom, slice_resolution, slice_center_longitude, slice_center_latitude, emmission_angle, incidence_angle, sub_solar_azimuth, north_azimuth, sun_angle, transfo
+       parent_name, parent_trim_left, parent_trim_right, zoom, slice_resolution, slice_center_longitude, slice_center_latitude, emmission_angle, incidence_angle, sub_solar_azimuth, north_azimuth, transfo
 from assets
 left join mzslices
 on assets.name = mzslices.slice_name;
