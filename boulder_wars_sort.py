@@ -205,32 +205,32 @@ class WarsSort:
     def sort_battles(self, results_filename='csv/mz_results_boulders.csv',
                      images_filename='csv/mz_images_boulders.csv',
                      out_filename='csv/mz_boulders_rank.csv'):
-        p = np.genfromtxt(images_filename, delimiter=',', names=True)
+        p = np.recfromcsv(images_filename, names=True)
         objid = p.field('id')
         rank = np.zeros(objid.shape, np.int) - 1
         fracrank = np.zeros(objid.shape) - 1
-        battles = np.genfromtxt(results_filename, delimiter=',', names=True)
-        for b in battles:
-            first = b.field('first_asset_id')
-            second = b.field('second_asset_id')
-            winner = b.field('winner')
-            w = np.where(winner == 1, first)
-            l = np.where(winner == 2, second)
-            # currently does not do anything with inconclusive battles
-            competitors = np.unique(np.concatenate((w, l)))
-            self.competitors = self._asarray(competitors)
-            self.winners = self._asarray(w)
-            self.losers = self._asarray(l)
-            self._consistency_check()
-            self._setup_internal_variables()
-            print('Battle %i, ncomp = %i, nwars = %i'%(b, self.ncomp, self.nwars))
-            self.iterate()
-            for r, id in enumerate(self.ranking):
-                idx = (objid == id).nonzero()[0][0]
-                rank[idx] = r
-                fracrank[idx] = float(r) / self.ncomp
-        np.savetxt(out_filename, (objid, rank, fracrank),
-                   delimiter=',',
+        battles = np.recfromcsv(results_filename, names=True)
+        # currently does not do anything with inconclusive battles
+        battles = battles[battles.field('winner') > 0]
+        first = battles['first_asset_id']
+        second = battles['second_asset_id']
+        winner = battles['winner']
+        w = np.where(winner == 1, first, second)
+        l = np.where(winner == 1, second, first)
+        competitors = np.unique(np.concatenate((w, l)))
+        self.competitors = self._asarray(competitors)
+        self.winners = self._asarray(w)
+        self.losers = self._asarray(l)
+        self._consistency_check()
+        self._setup_internal_variables()
+        print('ncomp = %i, nwars = %i'%(self.ncomp, self.nwars))
+        self.iterate()
+        for r, id in enumerate(self.ranking):
+            idx = (objid == id).nonzero()[0][0]
+            rank[idx] = r
+            fracrank[idx] = float(r) / self.ncomp
+        np.savetxt(out_filename, np.asarray((objid, rank, fracrank)).T,
+                   fmt='%d,%d,%.3f',
                    header=("objid,rank,fracrank"))
 
     def __enter__(self):
