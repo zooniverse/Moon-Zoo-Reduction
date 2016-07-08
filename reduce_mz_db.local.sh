@@ -79,6 +79,7 @@ cat scripts/read_mzp_db.sql | mysql -uroot -ppppzsb2 moonzoo &> read_mzp_db.sql.
 
 cat scripts/reduce_mz_db_boulders.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db_boulders.sql.out &
 cp /tmp/mz_results_boulders.csv csv/
+cp /tmp/mz_slices_boulders.csv csv/
 
 cat scripts/reduce_mz_db.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db.sql.out &
 cp /tmp/mz_results_craters.csv /tmp/mz_results_regions.csv csv/
