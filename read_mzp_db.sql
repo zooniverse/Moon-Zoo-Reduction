@@ -174,11 +174,12 @@ create table `assetinfo` (
   `sub_solar_azimuth` float DEFAULT NULL,
   `north_azimuth` float DEFAULT NULL,
   `transfo` int(11) DEFAULT NULL,
+  `criterion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 );
 insert into assetinfo
 select assets.*,
-       parent_name, parent_trim_left, parent_trim_right, zoom, slice_resolution, slice_center_longitude, slice_center_latitude, emmission_angle, incidence_angle, sub_solar_azimuth, north_azimuth, transfo
+       parent_name, parent_trim_left, parent_trim_right, zoom, slice_resolution, slice_center_longitude, slice_center_latitude, emmission_angle, incidence_angle, sub_solar_azimuth, north_azimuth, transfo, criterion
 from assets
 left join mzslices
 on assets.name = mzslices.slice_name;
