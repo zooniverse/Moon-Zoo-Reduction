@@ -56,7 +56,9 @@ create table `boulder_results` (
 insert into boulder_results
 select classification_id, first_asset_id, second_asset_id, (case winner_asset_id when cast(first_asset_id as char) then 1 when cast(second_asset_id as char) then 2 else 0 end), first_assets.name, first_assets.zoom, first_assets.slice_resolution, first_assets.slice_center_longitude, first_assets.slice_center_latitude, first_assets.emission_angle, first_assets.incidence_angle, first_assets.sub_solar_azimuth, first_assets.north_azimuth, first_assets.sun_angle, first_assets.transfo, second_assets.name, second_assets.zoom, second_assets.slice_resolution, second_assets.slice_center_longitude, second_assets.slice_center_latitude, second_assets.emission_angle, second_assets.incidence_angle, second_assets.sub_solar_azimuth, second_assets.north_azimuth, second_assets.sun_angle, second_assets.transfo, zooniverse_user_id
 from xb, assetinfo as first_assets, assetinfo as second_assets
-where xb.first_asset_id=first_assets.id
+where first_assets.criterion='boulders'
+and second_assets.criterion='boulders'
+and xb.first_asset_id=first_assets.id
 and xb.second_asset_id=second_assets.id;
 
 
