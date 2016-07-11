@@ -226,7 +226,10 @@ class WarsSort:
         print('ncomp = %i, nwars = %i'%(self.ncomp, self.nwars))
         self.iterate()
         for r, id in enumerate(self.ranking):
-            idx = (objid == id).nonzero()[0][0]
+            idx = (objid == id).nonzero()[0]
+            if len(idx) < 1:
+                print('Could not find objid match for id={}, rank={}'.format(id, r))
+            idx = idx[0]
             rank[idx] = r
             fracrank[idx] = float(r) / self.ncomp
         np.savetxt(out_filename, np.asarray((objid, rank, fracrank)).T,
