@@ -117,12 +117,33 @@ def getlatlonginfo((cub_file, line, sample)):
     # to work around this, I run another campt offset by 1 pixel in line and sample,
     # and use the offset in long and lat to get the relevant pixel scales
     lat, long = run_campt((cub_file, line, sample))
+    if lat < -998:
+        return -999, -999, 0, 0, 0
+
     lat_l, long_l = run_campt((cub_file, line+1, sample))
+    if lat < -998:
+        lat_l, long_l = run_campt((cub_file, line-1, sample))
+        if lat < -998:
+            return -999, -999, 0, 0, 0
+        else:
+            dlat_l = -(lat_l - lat) / degrees_per_metre
+            dlong_l = -(long_l - long) * cos(lat*pi/180.) / degrees_per_metre
+    else:
+        dlat_l = (lat_l - lat) / degrees_per_metre
+        dlong_l = (long_l - long) * cos(lat*pi/180.) / degrees_per_metre
+
     lat_s, long_s = run_campt((cub_file, line, sample+1))
-    dlat_l = (lat_l - lat) / degrees_per_metre
-    dlong_l = (long_l - long) * cos(lat*pi/180.) / degrees_per_metre
-    dlat_s = (lat_s - lat) / degrees_per_metre
-    dlong_s = (long_s - long) * cos(lat*pi/180.) / degrees_per_metre
+    if lat < -998:
+        lat_s, long_s = run_campt((cub_file, line, sample-1))
+        if lat < -998:
+            return -999, -999, 0, 0, 0
+        else:
+            dlat_s = -(lat_s - lat) / degrees_per_metre
+            dlong_s = -(long_s - long) * cos(lat*pi/180.) / degrees_per_metre
+    else:
+        dlat_s = (lat_s - lat) / degrees_per_metre
+        dlong_s = (long_s - long) * cos(lat*pi/180.) / degrees_per_metre
+
     if abs(dlong_s) > 1e-5:
         phi = atan(dlat_s / dlong_s)
     else:
@@ -141,7 +162,10 @@ def run_campt((cub_file, line, sample)):
     cmd = 'campt from=%s to=%s format=flat append=true type=image line=%s sample=%s > /dev/null' % (cub_file, tmpname, line, sample)
     status = os.system(cmd) # returns the exit status, check it
     if status > 0:
-        raise ISISError("Execution of campt failed.")
+        print 'Error running command:'
+        print cmd
+        return -999, -999
+        #raise ISISError("Execution of campt failed.")
     # Run command and output to a temp file
     tmp = file(tmpname)
     l = tmp.readline()
@@ -157,7 +181,7 @@ class Usage(Exception):
         self.msg = msg
 
 class ISISError(Exception):
-    def __init__(self, msg):
+    def __init__(self, msg=""):
         self.msg = msg
 
 def main(argv=None):

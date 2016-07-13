@@ -18,7 +18,9 @@ def make_hdf5():
         crater_results = file(os.path.join(datapath, 'mz_results_craters.csv'))
         crater_table = h5file.createTable('/', 'craters', MZCrater, "Moon Zoo raw craters")
         crater = crater_table.row
-        for i, r in enumerate(crater_results):
+        for k, r in enumerate(crater_results):
+            if k == 0:
+                continue  # skip header
             for j, v in enumerate(r.split(',')):
                 try:
                     if rnames[j]=='value':
@@ -41,7 +43,9 @@ def make_hdf5():
         region_results = file(os.path.join(datapath, 'mz_results_regions.csv'))
         region_table = h5file.createTable('/', 'regions', MZRegion, "Moon Zoo raw regions")
         region = region_table.row
-        for i, r in enumerate(region_results):
+        for k, r in enumerate(region_results):
+            if k == 0:
+                continue  # skip header
             for j, v in enumerate(r.split(',')):
                 try:
                     if rnames[j]=='value':

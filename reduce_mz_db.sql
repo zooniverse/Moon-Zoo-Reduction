@@ -76,6 +76,19 @@ lines terminated by '\n'
 from results
 where task_id=2 and answer_id=3;
 
+select GROUP_CONCAT(column_name)
+into outfile '/tmp/mz_images_craters.csvheader'
+from information_schema.columns
+where table_name = 'assetinfo'
+and table_schema = 'moonzoo'
+order by ordinal_position;
+
+select * into outfile '/tmp/mz_images_craters.csv'
+fields terminated by ',' optionally enclosed by '"' escaped by '\\'
+lines terminated by '\n'
+from assetinfo
+where criterion = 'craters';
+
 -- boulders are more complicated as need to get both asset_ids
 
 drop table if exists asset_counts;

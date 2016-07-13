@@ -12,20 +12,21 @@
 sudo pip install pymysql
 
 # If need ISIS:
-sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
-cd /data1
-sudo mkdir isis3
-sudo chown -R ppzsb1:ppzsb1 /data1/isis3
-cd isis3
-rsync -az --delete --partial isisdist.astrogeology.usgs.gov::x86-64_linux_RHEL6/isis .
-rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/base data/
-rsync -az --exclude='kernels' --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro data/
-rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/tspk data/lro/kernels/
-rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/pck data/lro/kernels/
-echo '
-export ISISROOT=/data1/isis3/isis
-. $ISISROOT/scripts/isis3Startup.sh
-' >> ~/.profile
+# OUTDATED: now use isisInstall.sh GUI installer!
+# sudo apt-get -y install libjpeg62 libqt4-svg libfontconfig1 libxrender1 libsm6
+# cd /data1
+# sudo mkdir isis3
+# sudo chown -R ppzsb1:ppzsb1 /data1/isis3
+# cd isis3
+# rsync -az --delete --partial isisdist.astrogeology.usgs.gov::x86-64_linux_RHEL6/isis .
+# rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/base data/
+# rsync -az --exclude='kernels' --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro data/
+# rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/tspk data/lro/kernels/
+# rsync -az --delete --partial isisdist.astrogeology.usgs.gov::isis3data/data/lro/kernels/pck data/lro/kernels/
+# echo '
+# export ISISROOT=/data1/isis3/isis
+# . $ISISROOT/scripts/isis3Startup.sh
+# ' >> ~/.profile
 
 
 mkdir ~/quickdata/moonzoo
@@ -82,10 +83,11 @@ cat /tmp/mz_results_boulders.csvheader /tmp/mz_results_boulders.csv > csv/mz_res
 cat /tmp/mz_images_boulders.csvheader /tmp/mz_images_boulders.csv > csv/mz_images_boulders.csv
 
 cat scripts/reduce_mz_db.sql | mysql -uroot -ppppzsb2 moonzoo &> reduce_mz_db.sql.out
-cat /tmp/mz_results.csvheader /tmp/mz_results_craters.csv csv/mz_results_craters.csv
-cat /tmp/mz_results.csvheader /tmp/mz_results_regions.csv csv/mz_results_regions.csv
+cat /tmp/mz_results.csvheader /tmp/mz_results_craters.csv > csv/mz_results_craters.csv
+cat /tmp/mz_results.csvheader /tmp/mz_results_regions.csv > csv/mz_results_regions.csv
+cat /tmp/mz_images_craters.csvheader /tmp/mz_images_craters.csv > csv/mz_images_craters.csv
 
-python scripts/reduce_mz_db.py &> reduce_mz_db.py.out # actually done function by function last time
+python scripts/reduce_mz_db.py &> reduce_mz_db.py.out
 
 cat scripts/read_reduced_mz_tables.sql | mysql -uroot -ppppzsb2 moonzoo &> read_reduced_mz_tables.sql.out
 
@@ -108,22 +110,25 @@ wget -i ../selected_nac_urls_a17
 wget -i ../selected_nac_urls_a12
 cd ..
 
-ls img | colrm 13 > selected_nacs
+ls img | grep "^M" | colrm 13 > selected_nacs
 
 mkdir tmp
 cat selected_nacs | xargs -I{} lronac2isis from=img/{}.IMG to=tmp/{}.cub
+rm -rf img
 mkdir cub
 cat selected_nacs | xargs -I{} lronaccal from=tmp/{}.cub to=cub/{}.cub
 rm -rf tmp
 cat selected_nacs | xargs -I{} spiceinit web=yes from=cub/{}.cub
-mkdir fits
-cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
+#mkdir fits
+#cat selected_nacs | xargs -I{} isis2fits from=cub/{}.cub to=fits/{}.fits
+
+# HERE
 
 mkdir markings
-cat create_classification_stats.sql | mysql -uroot -ppppzsb2 moonzoo
-cat selected_nacs | xargs -I{} python /home/ppzsb1/projects/zooniverse/Moon-Zoo-Reduction/pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out
+cat scripts/create_classification_stats.sql | mysql -uroot -ppppzsb2 moonzoo
+nohup cat selected_nacs | xargs -I{} python scripts/pix2latlong.py db:moonzoo markings/{}.csv cub/{}.cub {} &> pix2latlong.py.out &
 
-cat selected_nacs | xargs -I{} python /home/ppzsb1/projects/zooniverse/Moon-Zoo-Reduction/slice2latlong.py moonzoo cub/{}.cub {} &> slice2latlong.py.out
+cat selected_nacs | xargs -I{} python scripts/slice2latlong.py moonzoo cub/{}.cub {} &> slice2latlong.py.out
 
 # Clustering not done...
 
@@ -132,5 +137,5 @@ mkdir clusters
 
 # full clustering!
 cat create_user_weights.sql | mysql -uroot moonzoo
-( cat selected_nacs | xargs -I{} python /home/ppzsb1/projects/zooniverse/Moon-Zoo-Reduction/mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
+( cat selected_nacs | xargs -I{} python scripts/mz_cluster.py clusters/{} markings/{}.csv expert_new.csv\
     1.0 2 10 3 4.0 0.4 0.5 30.655 30.800 20.125 20.255 &> mz_cluster.py.out ) &

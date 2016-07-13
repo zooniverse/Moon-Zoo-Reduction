@@ -131,7 +131,6 @@ fields terminated by ',' optionally enclosed by '"' escaped by '\\'
 lines terminated by '\n'
 ignore 1 lines;
 
-create unique index name_index on assets (name);
 
 drop table if exists assetinfo;
 create table `assetinfo` (
